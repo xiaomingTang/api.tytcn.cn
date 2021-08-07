@@ -1,7 +1,7 @@
-import { IsValidUsername } from 'src/decorators/is-valid-username'
+import { IsValidNickname } from 'src/decorators/is-valid-nickname'
 
 export class UpdateUserInfoDto {
-  @IsValidUsername()
+  @IsValidNickname()
   readonly nickname: string = '';
 
   readonly avatar: string = '';

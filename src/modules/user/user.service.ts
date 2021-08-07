@@ -4,21 +4,57 @@ import { JwtService } from '@nestjs/jwt'
 import { Like, Repository } from 'typeorm'
 import { isEmail, isPhoneNumber } from 'class-validator'
 
-import { UserEntity } from 'src/entities'
+import { RoleEntity, UserEntity } from 'src/entities'
 import { dangerousAssignSome, pick } from 'src/utils/object'
 import { CryptoUtil } from 'src/utils/crypto.util'
-import { CreateUserByEmailDto } from './dto/create-user-by-email.dto'
-import { CreateUserByPhoneDto } from './dto/create-user-by-phone.dto'
-import { UpdateUserInfoDto } from './dto/update-user-info.dto'
-import { SigninWithPasswordDto } from './dto/signin.dto'
+import { CreateUser } from './dto/create-user.dto'
+import { UpdateUserInfoDto } from './dto/update-userinfo.dto'
+import { SignindDto } from './dto/signin.dto'
+import { UserOnlineState } from 'src/constants'
 
 export interface UserRO {
   id: string;
-  phone: string;
   nickname: string;
-  email: string;
   avatar: string;
   token: string;
+  phone: string;
+  email: string;
+  onlineState: UserOnlineState;
+  friends: UserRO[];
+  roles: string[];
+  groups: string[];
+  ownGroups: string[];
+  postedMessages: string[];
+  receivedMessages: string[];
+}
+
+const defaultUserRO: UserRO = {
+  id: '',
+  nickname: '',
+  avatar: '',
+  token: '',
+  phone: '',
+  email: '',
+  onlineState: UserOnlineState.Off,
+  friends: [],
+  roles: [],
+  groups: [],
+  ownGroups: [],
+  postedMessages: [],
+  receivedMessages: [],
+}
+
+interface GetableParams<K extends keyof UserEntity> {
+  key: K;
+  value: string;
+  /**
+   * @default false
+   */
+  fuzzy?: boolean;
+  /**
+   * @default []
+   */
+  relations?: (keyof UserEntity)[];
 }
 
 @Injectable()
@@ -34,159 +70,102 @@ export class UserService {
     private readonly jwtService: JwtService,
   ) {}
 
-  async getUniqueUser({ type, value }: {
-    type: 'id' | 'email' | 'phone';
-    value: string;
-  }) {
-    switch (type) {
-      case 'email': {
-        const user = await this.getEntityByEmail({ email: value })
-        return this.buildUserRO(user, { withToken: false })
+  async getEntities({
+    key,
+    value,
+    fuzzy = false,
+    relations = [],
+  }: GetableParams<'id' | 'email' | 'phone' | 'nickname'>): Promise<UserEntity[]> {
+    if (!value) {
+      throw new BadRequestException(`unknown value: ${value}`)
+    }
+    const searchableKeys: (keyof UserEntity)[] = ['id', 'email', 'phone', 'nickname']
+    if (!searchableKeys.includes(key)) {
+      throw new BadRequestException(`unknown key: ${key}`)
+    }
+    let datas: UserEntity[] = []
+    if (fuzzy) {
+      datas = await this.userRepo.find({
+        where: {
+          [key]: Like(`%${value}%`),
+        },
+        relations,
+      })
+    } else {
+      const res = await this.userRepo.findOne({
+        where: {
+          [key]: value,
+        },
+        relations,
+      })
+      if (!res) {
+        throw new BadRequestException('data not exist')
       }
-      case 'phone': {
-        const user = await this.getEntityByPhone({ phone: value })
-        return this.buildUserRO(user, { withToken: false })
-      }
-      default: {
-        const user = await this.getEntityById({ id: value })
-        return this.buildUserRO(user, { withToken: false })
-      }
+      datas = [res]
     }
-  }
-
-  async getUsers({ type, value }: {
-    type: 'nickname';
-    value: string;
-  }) {
-    if (type !== 'nickname') {
-      throw new BadRequestException(`unknown type: ${type}`)
-    }
-    const users = await this.getEntitiesByNickname({ nickname: value })
-    return users.map((user) => this.buildUserRO(user, { withToken: false }))
-  }
-
-  async getEntityById({
-    id, relations = [],
-  }: {
-    id: string;
-    relations?: (keyof UserEntity)[];
-  }): Promise<UserEntity> {
-    if (!id) {
-      throw new BadRequestException('id 为空')
-    }
-    const data = await this.userRepo.findOne({
-      where: {
-        id,
-      },
-      relations,
-    })
-    if (!data) {
-      throw new BadRequestException('用户不存在')
-    }
-    return data
-  }
-
-  async getEntityByEmail({
-    email, relations = [],
-  }: {
-    email: string;
-    relations?: (keyof UserEntity)[];
-  }): Promise<UserEntity> {
-    if (!email) {
-      throw new BadRequestException('邮箱 为空')
-    }
-    const data = await this.userRepo.findOne({
-      where: {
-        email,
-      },
-      relations,
-    })
-    if (!data) {
-      throw new BadRequestException('用户不存在')
-    }
-    return data
-  }
-
-  async getEntityByPhone({
-    phone, relations = [],
-  }: {
-    phone: string;
-    relations?: (keyof UserEntity)[];
-  }): Promise<UserEntity> {
-    if (!phone) {
-      throw new BadRequestException('手机号 为空')
-    }
-    const data = await this.userRepo.findOne({
-      where: {
-        phone,
-      },
-      relations,
-    })
-    if (!data) {
-      throw new BadRequestException('用户不存在')
-    }
-    return data
-  }
-
-  async getEntitiesByNickname({
-    nickname, relations = [],
-  }: {
-    nickname: string;
-    relations?: (keyof UserEntity)[];
-  }): Promise<UserEntity[]> {
-    if (!nickname) {
-      throw new BadRequestException('用户昵称为空')
-    }
-    const users = await this.userRepo.find({
-      where: {
-        nickname: Like(`%${nickname}%`),
-      },
-      relations,
-    })
-    return users
+    return datas
   }
 
   /**
-   * @param account 登录账号, 可能是 email 或 phone
+   * @param account 登录账号, 可能是 email 或 phone 或 id
    */
-  async signinWithPassword({ account, password }: SigninWithPasswordDto): Promise<UserRO> {
-    let user: UserEntity
-    if (isEmail(account)) {
-      user = await this.getEntityByEmail({ email: account })
-    } else if (isPhoneNumber(account)) {
-      user = await this.getEntityByPhone({ phone: account })
+  async signin({ accountType, account, signinType, code }: SignindDto): Promise<UserRO> {
+    const key: keyof UserEntity = accountType === 'email' ? 'email' : 'phone'
+    if (key === 'email' && !isEmail(account)) {
+      throw new BadRequestException('邮箱格式有误')
+    }
+    if (key === 'phone' && !isPhoneNumber(account, 'CN')) {
+      throw new BadRequestException('手机号格式有误')
+    }
+    const relations: (keyof UserEntity)[] = ['roles']
+    const users = await this.getEntities({
+      key,
+      value: account,
+      fuzzy: false,
+      relations,
+    }).catch(() => ([])) /* 阻止默认的报错, 下面是用自定义报错 */
+    const user = users[0]
+    if (signinType === 'authCode') {
+      if (!user) {
+        throw new BadRequestException('账号或验证码有误: 账号不存在')
+      }
+  
+      // @TODO: 验证码校验逻辑
+      if (code.length !== 4) {
+        throw new BadRequestException('账号或验证码有误: 验证码有误')
+      }
     } else {
-      user = await this.getEntityById({ id: account })
-    }
-    if (!user) {
-      throw new BadRequestException('账号不存在')
+      if (!user) {
+        throw new BadRequestException('账号或密码有误: 账号不存在')
+      }
+  
+      if (!this.cryptoUtil.checkPassword(code, user.password)) {
+        throw new BadRequestException('账号或密码有误: 密码有误')
+      }
     }
 
-    if (!this.cryptoUtil.checkPassword(password, user.password)) {
-      throw new BadRequestException('登录密码有误')
-    }
-
-    return this.buildUserRO(user, { withToken: true })
+    return this.buildUserRO(user, { withToken: true, relations })
   }
 
-  async createByEmail(dto: CreateUserByEmailDto): Promise<string> {
+  async createUser({
+    accountType: uniqueKey, account: uniqueValue,
+    ...dto
+  }: CreateUser): Promise<string> {
     // @TODO: 验证 authCode
-    const newUser = dangerousAssignSome(new UserEntity(), dto, 'avatar', 'email', 'nickname', 'password')
-
-    try {
-      const savedUser = await this.userRepo.save(newUser)
-      return savedUser.id
-    } catch (error) {
-      throw new BadRequestException(`注册失败, ${error.message}`)
+    const curUser = dangerousAssignSome(new UserEntity(), dto, 'avatar', 'nickname', 'password')
+    switch (uniqueKey) {
+      case 'email':
+        curUser.email = uniqueValue
+        break
+      case 'phone':
+        curUser.phone = uniqueValue
+        break
+      default:
+        throw new BadRequestException(`unknown uniqueKey: ${uniqueKey}`)
     }
-  }
-
-  async createByPhone(dto: CreateUserByPhoneDto): Promise<string> {
-    // @TODO: 验证 authCode
-    const newUser = dangerousAssignSome(new UserEntity(), dto, 'avatar', 'phone', 'nickname', 'password')
 
     try {
-      const savedUser = await this.userRepo.save(newUser)
+      const savedUser = await this.userRepo.save(curUser)
       return savedUser.id
     } catch (error) {
       throw new BadRequestException(`注册失败, ${error.message}`)
@@ -196,7 +175,7 @@ export class UserService {
   async updateUserInfo(id: string, dto: UpdateUserInfoDto): Promise<boolean> {
     await this.userRepo.update({
       id,
-    }, pick(dto, 'avatar', 'nickname'))
+    }, pick(dto, ['avatar', 'nickname']))
 
     return true
   }
@@ -207,6 +186,57 @@ export class UserService {
     })
 
     return true
+  }
+
+  static exportAsItem(user: UserEntity): UserRO {
+    return {
+      ...defaultUserRO,
+      ...pick(user, ['id', 'nickname', 'phone', 'email', 'avatar']),
+    }
+  }
+
+  public buildUserRO(user: UserEntity, {
+    withToken = false,
+    relations = [],
+  }: {
+    withToken?: boolean;
+    relations?: (keyof UserEntity)[];
+  }): UserRO {
+    const filteredUser: UserRO = {
+      ...defaultUserRO,
+      ...pick(user, ['id', 'nickname', 'phone', 'email', 'avatar']),
+      token: withToken
+        ? this.generateJWT(user)
+        : '',
+      roles: (user.roles ?? []).map((item) => item.name),
+    }
+
+    relations.forEach((r) => {
+      switch (r) {
+        case 'friends':
+          filteredUser.friends = user.friends.map((item) => UserService.exportAsItem(item))
+          break
+        case 'groups':
+          filteredUser.groups = user.groups.map((item) => item.name)
+          break
+        case 'ownGroups':
+          filteredUser.ownGroups = user.ownGroups.map((item) => item.name)
+          break
+        case 'postedMessages':
+          filteredUser.postedMessages = user.postedMessages.map((item) => item.content)
+          break
+        case 'receivedMessages':
+          filteredUser.receivedMessages = user.receivedMessages.map((item) => item.content)
+          break
+        case 'roles':
+          filteredUser.roles = user.roles.map((item) => item.name)
+          break
+        default:
+          break
+      }
+    })
+    
+    return filteredUser
   }
 
   public generateJWT(user: UserEntity) {
@@ -220,20 +250,5 @@ export class UserService {
       iat: now,
       nbf: now,
     })
-  }
-
-  public buildUserRO(user: UserEntity, {
-    withToken,
-  }: {
-    withToken: boolean;
-  }): UserRO {
-    return {
-      id: user.id,
-      nickname: user.nickname,
-      phone: user.phone,
-      email: user.email,
-      avatar: user.avatar,
-      token: withToken ? this.generateJWT(user) : '',
-    }
   }
 }

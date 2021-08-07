@@ -3,7 +3,7 @@ import {
 } from 'class-validator'
 
 @ValidatorConstraint()
-class IsValidUsernameConstraint implements ValidatorConstraintInterface {
+class IsValidNicknameConstraint implements ValidatorConstraintInterface {
   validate(name: string) {
     return !!name && name.length >= 3 && name.length <= 16
   }
@@ -13,7 +13,7 @@ class IsValidUsernameConstraint implements ValidatorConstraintInterface {
   }
 }
 
-export function IsValidUsername(validationOptions?: ValidationOptions) {
+export function IsValidNickname(validationOptions?: ValidationOptions) {
   // eslint-disable-next-line @typescript-eslint/ban-types
   return function (object: Object, propertyName: string) {
     registerDecorator({
@@ -21,7 +21,7 @@ export function IsValidUsername(validationOptions?: ValidationOptions) {
       propertyName,
       options: validationOptions,
       constraints: [],
-      validator: IsValidUsernameConstraint,
+      validator: IsValidNicknameConstraint,
     })
   }
 }

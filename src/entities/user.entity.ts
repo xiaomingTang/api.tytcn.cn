@@ -1,5 +1,5 @@
 import {
-  Column, Entity, ManyToMany, OneToMany, BeforeInsert,
+  Column, Entity, ManyToMany, OneToMany, BeforeInsert, JoinTable,
 } from 'typeorm'
 import * as argon2 from 'argon2'
 import { IsEmail, IsPhoneNumber } from 'class-validator'
@@ -54,11 +54,13 @@ export class UserEntity extends BaseEntityWithPublicId {
   // -------------------------
 
   @ManyToMany(() => UserEntity, (u) => u.friends)
+  @JoinTable()
   friends?: UserEntity[]
 
   @ManyToMany(() => RoleEntity, (r) => r.users, {
     cascade: true,
   })
+  @JoinTable()
   roles?: RoleEntity[]
 
   /**
@@ -67,6 +69,7 @@ export class UserEntity extends BaseEntityWithPublicId {
   @ManyToMany(() => GroupEntity, (g) => g.users, {
     cascade: true,
   })
+  @JoinTable()
   groups?: GroupEntity[]
 
   /**
@@ -75,17 +78,20 @@ export class UserEntity extends BaseEntityWithPublicId {
   @OneToMany(() => GroupEntity, (g) => g.owner, {
     cascade: true,
   })
+  @JoinTable()
   ownGroups?: GroupEntity[]
 
   /**
    * 已发送消息
    */
   @OneToMany(() => MessageEntity, (m) => m.fromUser)
+  @JoinTable()
   postedMessages?: MessageEntity[]
 
   /**
    * 已接收消息
    */
   @ManyToMany(() => MessageEntity, (m) => m.toUsers)
+  @JoinTable()
   receivedMessages?: MessageEntity[]
 }

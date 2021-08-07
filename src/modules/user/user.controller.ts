@@ -3,9 +3,9 @@ import {
 } from '@nestjs/common'
 import { Roles } from 'src/decorators/guard.decorator'
 import { RolesGuard } from 'src/guards/roles.guard'
-import { CreateUserByPhoneDto } from './dto/create-user-by-phone.dto'
-import { SigninWithPasswordDto } from './dto/signin.dto'
-import { UpdateUserInfoDto } from './dto/update-user-info.dto'
+import { CreateUser } from './dto/create-user.dto'
+import { SignindDto } from './dto/signin.dto'
+import { UpdateUserInfoDto } from './dto/update-userinfo.dto'
 import { UserService } from './user.service'
 
 @Controller('/api/user')
@@ -13,35 +13,39 @@ export class UserController {
   constructor(private readonly userService: UserService) {}
 
   @Post('signin')
-  signinWithPassword(@Body() dto: SigninWithPasswordDto) {
-    return this.userService.signinWithPassword(dto)
+  signin(@Body() dto: SignindDto) {
+    return this.userService.signin(dto)
   }
 
-  @Get(':id')
-  getById(@Param('id') id: string) {
-    return this.userService.getUniqueUser({ type: 'id', value: id })
+  @Get('id/:id')
+  async getById(@Param('id') id: string) {
+    const datas = await this.userService.getEntities({ key: 'id', value: id, fuzzy: false, relations: ['roles'] })
+    return datas.map((item) => this.userService.buildUserRO(item, {}))[0]
   }
 
   // @Roles('admin')
   // @UseGuards(RolesGuard)
-  @Get('search/email/:email')
-  getByEmail(@Param('email') email: string) {
-    return this.userService.getUniqueUser({ type: 'email', value: email })
+  @Get('email/:email')
+  async getByEmail(@Param('email') email: string) {
+    const datas = await this.userService.getEntities({ key: 'email', value: email, fuzzy: false, relations: ['roles'] })
+    return datas.map((item) => this.userService.buildUserRO(item, {}))[0]
   }
 
-  @Get('search/phone/:phone')
-  getByPhone(@Param('phone') phone: string) {
-    return this.userService.getUniqueUser({ type: 'phone', value: phone })
+  @Get('phone/:phone')
+  async getByPhone(@Param('phone') phone: string) {
+    const datas = await this.userService.getEntities({ key: 'phone', value: phone, fuzzy: false, relations: ['roles'] })
+    return datas.map((item) => this.userService.buildUserRO(item, {}))[0]
   }
 
-  @Get('search/nickname/:nickname')
-  getsByNickname(@Param('nickname') nickname: string) {
-    return this.userService.getUsers({ type: 'nickname', value: nickname })
+  @Get('nickname/:nickname')
+  async getsByNickname(@Param('nickname') nickname: string) {
+    const datas = await this.userService.getEntities({ key: 'nickname', value: nickname, fuzzy: true, relations: ['roles'] })
+    return datas.map((item) => this.userService.buildUserRO(item, {}))
   }
 
   @Post('phone')
-  async createByPhone(@Body() dto: CreateUserByPhoneDto) {
-    return this.userService.createByPhone(dto)
+  async createByPhone(@Body() dto: CreateUser) {
+    return this.userService.createUser(dto)
   }
 
   @Put(':id')

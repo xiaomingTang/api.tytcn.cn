@@ -23,7 +23,7 @@ export function dangerousAssignSome<T extends Record<string, any>, S extends Rec
   return target
 }
 
-export function pick<T extends Record<string, any>, K extends keyof T>(obj: T, ...keys: K[]): Pick<T, K> {
+export function pick<T extends Record<string, any>, K extends keyof T>(obj: T, keys: K[]): Pick<T, K> {
   const result = {} as Pick<T, K>
   keys.forEach((k) => {
     result[k] = obj[k]

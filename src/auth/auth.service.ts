@@ -9,6 +9,7 @@ export class AuthService {
   ) {}
 
   async validateUser(id: string): Promise<UserEntity> {
-    return this.usersService.getEntityById({ id, relations: ['roles'] })
+    const datas = await this.usersService.getEntities({ key: 'id', value: id, relations: ['roles'] })
+    return datas[0]
   }
 }
