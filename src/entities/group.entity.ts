@@ -7,11 +7,11 @@ import { UserEntity } from './user.entity'
 
 @Entity()
 export class GroupEntity extends BaseEntityWithPublicId {
-  @Column({ unique: true })
-  name!: string
+  @Column({ unique: true, default: '' })
+  name: string
 
   @Column({ default: '群主很懒，什么都没写' })
-  notice!: string
+  notice: string
 
   // -------------------------
   // 其他复杂关系

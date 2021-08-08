@@ -4,11 +4,11 @@ import { UserEntity } from './user.entity'
 
 @Entity()
 export class RoleEntity extends BaseEntityWithPrivateId {
-  @Column({ unique: true })
-  name!: string
+  @Column({ unique: true, default: '' })
+  name: string
 
   @Column({ default: '描述' })
-  description!: string
+  description: string
 
   @ManyToMany(() => UserEntity, (u) => u.roles)
   users?: UserEntity

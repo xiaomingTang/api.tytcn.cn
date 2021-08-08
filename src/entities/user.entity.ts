@@ -2,7 +2,7 @@ import {
   Column, Entity, ManyToMany, OneToMany, BeforeInsert, JoinTable,
 } from 'typeorm'
 import * as argon2 from 'argon2'
-import { IsEmail, IsPhoneNumber } from 'class-validator'
+import { IsEmail, IsMobilePhone } from 'class-validator'
 
 import { UserOnlineState } from 'src/constants'
 import { GroupEntity } from './group.entity'
@@ -15,24 +15,24 @@ export class UserEntity extends BaseEntityWithPublicId {
   @Column({
     default: '',
   })
-  nickname!: string
+  nickname: string
 
   @Column({
     default: '',
   })
   @IsEmail()
-  email!: string
+  email: string
 
   @Column({
     default: '',
   })
-  @IsPhoneNumber('CN')
-  phone!: string
+  @IsMobilePhone('zh-CN')
+  phone: string
 
   @Column({
     default: '',
   })
-  password!: string
+  password: string
 
   @BeforeInsert()
   async hashPassword() {
@@ -42,12 +42,12 @@ export class UserEntity extends BaseEntityWithPublicId {
   @Column({
     default: '',
   })
-  avatar!: string
+  avatar: string
 
   @Column({
     default: UserOnlineState.On,
   })
-  onlineState!: UserOnlineState
+  onlineState: UserOnlineState
 
   // -------------------------
   // 其他复杂关系

@@ -24,7 +24,7 @@ export const TypeOrmConfig: TypeOrmModuleOptions = {
   port: 3306,
   username: 'root',
   password: '123456',
-  database: 'chat',
+  database: 'chat-room',
   charset: 'utf8mb4', // 设置 chatset 编码为 utf8mb4
   autoLoadEntities: true,
   synchronize: true, // @WARNING 不应在生产中使用设置, 否则可能会丢失生产数据

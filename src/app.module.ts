@@ -7,6 +7,8 @@ import { UserController } from './modules/user/user.controller'
 import { UserModule } from './modules/user/user.module'
 import { AuthModule } from './auth/auth.module'
 import { CoreModule } from './modules/core.module'
+import { GroupModule } from './modules/group/group.module'
+import { MessageModule } from './modules/message/message.module'
 
 @Module({
   imports: [
@@ -17,6 +19,8 @@ import { CoreModule } from './modules/core.module'
     CoreModule,
     AuthModule,
     UserModule,
+    GroupModule,
+    MessageModule,
   ],
   providers: [
     {

@@ -14,10 +14,10 @@ class BaseEntity {
   }
 
   @PrimaryGeneratedColumn()
-  _id!: number
+  _id: number
 
   @Column({ unique: true })
-  id!: string
+  id: string
 
   /**
    * 生成 id
@@ -31,10 +31,10 @@ class BaseEntity {
   }
 
   @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
-  createdTime!: Date
+  createdTime: Date
 
   @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
-  updatedTime!: Date
+  updatedTime: Date
 
   @BeforeUpdate()
   updateTimestamp() {

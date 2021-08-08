@@ -8,11 +8,11 @@ import { UserEntity } from './user.entity'
 
 @Entity()
 export class MessageEntity extends BaseEntityWithPrivateId {
-  @Column()
-  content!: string
+  @Column({ default: '' })
+  content: string
 
   @Column({ default: MessageType.Text })
-  type!: MessageType
+  type: MessageType
 
   // -------------------------
   // 其他复杂关系

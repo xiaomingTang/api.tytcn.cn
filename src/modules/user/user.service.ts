@@ -2,13 +2,13 @@ import { BadRequestException, Inject, Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { JwtService } from '@nestjs/jwt'
 import { Like, Repository } from 'typeorm'
-import { isEmail, isPhoneNumber } from 'class-validator'
+import { isEmail, isMobilePhone } from 'class-validator'
 
 import { RoleEntity, UserEntity } from 'src/entities'
 import { dangerousAssignSome, pick } from 'src/utils/object'
 import { CryptoUtil } from 'src/utils/crypto.util'
 import { CreateUser } from './dto/create-user.dto'
-import { UpdateUserInfoDto } from './dto/update-userinfo.dto'
+import { UpdateUserInfoDto } from './dto/update-user-info.dto'
 import { SignindDto } from './dto/signin.dto'
 import { UserOnlineState } from 'src/constants'
 
@@ -28,7 +28,7 @@ export interface UserRO {
   receivedMessages: string[];
 }
 
-const defaultUserRO: UserRO = {
+export const defaultUserRO: UserRO = {
   id: '',
   nickname: '',
   avatar: '',
@@ -68,7 +68,34 @@ export class UserService {
     @Inject(CryptoUtil) private readonly cryptoUtil: CryptoUtil,
 
     private readonly jwtService: JwtService,
-  ) {}
+  ) {
+    this.initAdmin()
+  }
+
+  async initAdmin() {
+    try {
+      await this.getEntities({
+        key: 'id',
+        value: 'admin',
+        fuzzy: false,
+      })
+    } catch(err) {
+      const adminId = await this.create({
+        avatar: '',
+        nickname: 'admin',
+        password: 'xiaoming1992',
+        authCode: '',
+        accountType: 'email',
+        account: '1038761793@qq.com',
+      })
+      await this.userRepo.update({
+        id: adminId,
+      }, {
+        id: 'admin',
+        phone: '17620307415',
+      })
+    }
+  }
 
   async getEntities({
     key,
@@ -114,7 +141,7 @@ export class UserService {
     if (key === 'email' && !isEmail(account)) {
       throw new BadRequestException('邮箱格式有误')
     }
-    if (key === 'phone' && !isPhoneNumber(account, 'CN')) {
+    if (key === 'phone' && !isMobilePhone(account, 'zh-CN')) {
       throw new BadRequestException('手机号格式有误')
     }
     const relations: (keyof UserEntity)[] = ['roles']
@@ -144,35 +171,51 @@ export class UserService {
       }
     }
 
-    return this.buildUserRO(user, { withToken: true, relations })
+    return this.buildRO({
+      ...user,
+      token: this.generateJWT(user),
+    })
   }
 
-  async createUser({
-    accountType: uniqueKey, account: uniqueValue,
+  async create({
+    accountType, account,
     ...dto
   }: CreateUser): Promise<string> {
     // @TODO: 验证 authCode
     const curUser = dangerousAssignSome(new UserEntity(), dto, 'avatar', 'nickname', 'password')
-    switch (uniqueKey) {
+    switch (accountType) {
       case 'email':
-        curUser.email = uniqueValue
+        if (!isEmail(account)) {
+          throw new BadRequestException('不是合法的邮箱')
+        }
+        curUser.email = account
         break
       case 'phone':
-        curUser.phone = uniqueValue
+        if (!isMobilePhone(account, 'zh-CN')) {
+          throw new BadRequestException('不是合法的手机号')
+        }
+        curUser.phone = account
         break
       default:
-        throw new BadRequestException(`unknown uniqueKey: ${uniqueKey}`)
+        throw new BadRequestException(`unknown accountType: ${accountType}`)
     }
 
     try {
-      const savedUser = await this.userRepo.save(curUser)
-      return savedUser.id
+      if (await this.getEntities({
+        key: accountType,
+        value: account,
+      })) {
+        throw new Error('账号已存在')
+      }
     } catch (error) {
-      throw new BadRequestException(`注册失败, ${error.message}`)
+      // pass
     }
+
+    const savedUser = await this.userRepo.save(curUser)
+    return savedUser.id
   }
 
-  async updateUserInfo(id: string, dto: UpdateUserInfoDto): Promise<boolean> {
+  async updateInfo(id: string, dto: UpdateUserInfoDto): Promise<boolean> {
     await this.userRepo.update({
       id,
     }, pick(dto, ['avatar', 'nickname']))
@@ -188,54 +231,28 @@ export class UserService {
     return true
   }
 
-  static exportAsItem(user: UserEntity): UserRO {
+  /**
+   * 作为其他对象的属性, 无需一些复杂的数组属性时, 使用该方法
+   */
+  exportAsItem(user: UserEntity): UserRO {
     return {
       ...defaultUserRO,
       ...pick(user, ['id', 'nickname', 'phone', 'email', 'avatar']),
     }
   }
 
-  public buildUserRO(user: UserEntity, {
-    withToken = false,
-    relations = [],
-  }: {
-    withToken?: boolean;
-    relations?: (keyof UserEntity)[];
-  }): UserRO {
+  public buildRO(user: UserEntity): UserRO {
     const filteredUser: UserRO = {
       ...defaultUserRO,
       ...pick(user, ['id', 'nickname', 'phone', 'email', 'avatar']),
-      token: withToken
-        ? this.generateJWT(user)
-        : '',
       roles: (user.roles ?? []).map((item) => item.name),
+      friends: (user.friends ?? []).map((item) => this.exportAsItem(item)),
+      groups: (user.groups ?? []).map((item) => item.name),
+      ownGroups: (user.ownGroups ?? []).map((item) => item.name),
+      postedMessages: (user.postedMessages ?? []).map((item) => item.content),
+      receivedMessages: (user.receivedMessages ?? []).map((item) => item.content),
     }
 
-    relations.forEach((r) => {
-      switch (r) {
-        case 'friends':
-          filteredUser.friends = user.friends.map((item) => UserService.exportAsItem(item))
-          break
-        case 'groups':
-          filteredUser.groups = user.groups.map((item) => item.name)
-          break
-        case 'ownGroups':
-          filteredUser.ownGroups = user.ownGroups.map((item) => item.name)
-          break
-        case 'postedMessages':
-          filteredUser.postedMessages = user.postedMessages.map((item) => item.content)
-          break
-        case 'receivedMessages':
-          filteredUser.receivedMessages = user.receivedMessages.map((item) => item.content)
-          break
-        case 'roles':
-          filteredUser.roles = user.roles.map((item) => item.name)
-          break
-        default:
-          break
-      }
-    })
-    
     return filteredUser
   }
 
