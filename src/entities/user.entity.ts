@@ -1,7 +1,7 @@
 import {
   Column, Entity, ManyToMany, OneToMany, BeforeInsert, JoinTable,
 } from 'typeorm'
-import * as argon2 from 'argon2'
+import { createHash } from 'crypto'
 import { IsEmail, IsMobilePhone } from 'class-validator'
 
 import { UserOnlineState } from 'src/constants'
@@ -36,7 +36,7 @@ export class UserEntity extends BaseEntityWithPublicId {
 
   @BeforeInsert()
   async hashPassword() {
-    this.password = await argon2.hash(this.password)
+    this.password = createHash('sha256').update(this.password).digest('hex')
   }
 
   @Column({

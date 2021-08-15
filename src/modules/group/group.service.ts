@@ -76,14 +76,14 @@ export class GroupService {
         relations,
       })
       if (!res) {
-        throw new BadRequestException('data not exist')
+        throw new BadRequestException(`group not exist: [${key}: ${value}]`)
       }
       datas = [res]
     }
     return datas
   }
 
-  async create(dto: CreateGroupDto): Promise<GroupRO> {
+  async create(dto: CreateGroupDto): Promise<string> {
     const newGroup = dangerousAssignSome(new GroupEntity(), dto, 'name', 'notice')
     const users = await this.userService.getEntities({
       key: 'id', value: dto.ownerId, relations: ['ownGroups']
@@ -101,7 +101,7 @@ export class GroupService {
       const savedGroup = await this.groupRepo.save(newGroup)
       await this.userRepo.save(newGroup.owner)
 
-      return this.buildRO(savedGroup)
+      return savedGroup.id
     } catch (error) {
       throw new BadRequestException(`群组创建失败 ${error.message}`)
     }

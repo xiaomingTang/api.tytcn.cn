@@ -126,7 +126,7 @@ export class UserService {
         relations,
       })
       if (!res) {
-        throw new BadRequestException('data not exist')
+        throw new BadRequestException(`user not exist: [${key}: ${value}]`)
       }
       datas = [res]
     }
@@ -165,16 +165,16 @@ export class UserService {
       if (!user) {
         throw new BadRequestException('账号或密码有误: 账号不存在')
       }
-  
+
       if (!this.cryptoUtil.checkPassword(code, user.password)) {
         throw new BadRequestException('账号或密码有误: 密码有误')
       }
     }
 
-    return this.buildRO({
-      ...user,
+    return {
+      ...this.buildRO(user),
       token: this.generateJWT(user),
-    })
+    }
   }
 
   async create({

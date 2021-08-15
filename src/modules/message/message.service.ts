@@ -81,7 +81,7 @@ export class MessageService {
         relations,
       })
       if (!res) {
-        throw new BadRequestException('data not exist')
+        throw new BadRequestException(`message not exist: [${key}: ${value}]`)
       }
       datas = [res]
     }
@@ -91,15 +91,19 @@ export class MessageService {
   async getsByFuzzySearch(dto: GetMessagesDto): Promise<MessageEntity[]> {
     const contentConvertedDto = pick(dto, ['content', 'fromUserId', 'toGroupId', 'toUserId', 'type'])
     contentConvertedDto.content = `%${contentConvertedDto.content}%`
+
+    // @TODO: Query 写错了, 待修正
+    const queryStr = [
+      dto.fromUserId && 'fromUser.id = :fromUserId',
+      dto.content && 'content like :content',
+      dto.toUserId && ':toUserId = toUser.id',
+      dto.toGroupId && ':toGroupId = toGroup.id',
+      dto.type && 'type = :type',
+    ].filter(Boolean).join(' AND ')
+
     const messages = await getRepository(MessageEntity)
       .createQueryBuilder('message')
-      .where([
-        dto.fromUserId && 'fromUser.id = :fromUserId',
-        dto.content && 'content like :content',
-        dto.toUserId && ':toUserId = toUser.id',
-        dto.toGroupId && ':toGroupId = toGroup.id',
-        dto.type && 'type = :type',
-      ].filter(Boolean).join(' AND '), contentConvertedDto)
+      .where(queryStr, contentConvertedDto)
       .leftJoin('message.fromUser', 'fromUser')
       .leftJoin('message.toUsers', 'toUser')
       .leftJoin('message.toGroups', 'toGroup')
@@ -107,7 +111,7 @@ export class MessageService {
     return messages
   }
 
-  async create(dto: CreateMessageDto): Promise<MessageRO> {
+  async create(dto: CreateMessageDto): Promise<string> {
     const newMessage = dangerousAssignSome(new MessageEntity(), dto, 'content', 'type')
 
     newMessage.fromUser = await this.userService.getEntities({
@@ -121,25 +125,25 @@ export class MessageService {
       throw new BadRequestException(`群发用户数或群组数不能超过 ${MAX_COUNT}`)
     }
     await asyncForEach(dto.toUserIds, async (id) => {
-      const targetUser = await this.userService.getEntities({
+      const targetUser = (await this.userService.getEntities({
         key: 'id',
         value: id,
-      })[0]
+      }))[0]
       newMessage.toUsers = newMessage.toUsers ?? []
       newMessage.toUsers.push(targetUser)
     })
     await asyncForEach(dto.toGroupIds, async (id) => {
-      const targetGroup = await this.groupService.getEntities({
+      const targetGroup = (await this.groupService.getEntities({
         key: 'id',
         value: id,
-      })[0]
+      }))[0]
       newMessage.toGroups = newMessage.toGroups ?? []
       newMessage.toGroups.push(targetGroup)
     })
 
     try {
       const savedMessage = await this.messageRepo.save(newMessage)
-      return this.buildRO(savedMessage)
+      return savedMessage.id
     } catch (error) {
       throw new BadRequestException(`消息发送失败: ${error.message}`)
     }

@@ -1,5 +1,5 @@
 import {
-  Body, Controller, Delete, Get, Param, Post,
+  Body, Controller, Delete, Get, Param, Post, Query,
 } from '@nestjs/common'
 import { CreateMessageDto } from './dto/create-message.dto'
 import { GetMessagesDto } from './dto/get-messages.dto'
@@ -12,11 +12,11 @@ export class MessageController {
   @Get('id/:id')
   async getById(@Param('id') id: string) {
     const datas = await this.messageService.getEntities({ key: 'id', value: id, fuzzy: false, relations: ['fromUser', 'toUsers', 'toGroups'] })
-    return this.messageService.buildRO(datas[0])
+    return datas.map((item) => this.messageService.buildRO(item))[0]
   }
 
   @Get('list')
-  async getList(@Body() dto: GetMessagesDto) {
+  async getList(@Query() dto: GetMessagesDto) {
     const datas = await this.messageService.getsByFuzzySearch(dto)
     return datas.map((item) => this.messageService.buildRO(item))
   }
