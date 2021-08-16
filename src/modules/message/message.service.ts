@@ -92,19 +92,18 @@ export class MessageService {
     const contentConvertedDto = pick(dto, ['content', 'fromUserId', 'toGroupId', 'toUserId', 'type'])
     contentConvertedDto.content = `%${contentConvertedDto.content}%`
 
-    // @TODO: Query 写错了, 待修正
     const queryStr = [
       dto.fromUserId && 'fromUser.id = :fromUserId',
-      dto.content && 'content like :content',
       dto.toUserId && ':toUserId = toUser.id',
       dto.toGroupId && ':toGroupId = toGroup.id',
       dto.type && 'type = :type',
+      dto.content && 'content like :content',
     ].filter(Boolean).join(' AND ')
 
     const messages = await getRepository(MessageEntity)
       .createQueryBuilder('message')
       .where(queryStr, contentConvertedDto)
-      .leftJoin('message.fromUser', 'fromUser')
+      .leftJoinAndSelect('message.fromUser', 'fromUser')
       .leftJoin('message.toUsers', 'toUser')
       .leftJoin('message.toGroups', 'toGroup')
       .getMany()
@@ -114,11 +113,11 @@ export class MessageService {
   async create(dto: CreateMessageDto): Promise<string> {
     const newMessage = dangerousAssignSome(new MessageEntity(), dto, 'content', 'type')
 
-    newMessage.fromUser = await this.userService.getEntities({
+    newMessage.fromUser = (await this.userService.getEntities({
       key: 'id',
       value: dto.fromUserId,
       relations: ['postedMessages'],
-    })[0]
+    }))[0]
 
     const MAX_COUNT = 10
     if (dto.toUserIds.length > MAX_COUNT || dto.toGroupIds.length > MAX_COUNT) {
