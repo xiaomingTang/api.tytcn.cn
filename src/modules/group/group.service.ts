@@ -7,6 +7,16 @@ import { dangerousAssignSome, pick } from 'src/utils/object'
 import { CreateGroupDto } from './dto/create-group.dto'
 import { UpdateGroupInfoDto } from './dto/update-group-info.dto'
 import { defaultUserRO, UserRO, UserService } from '../user/user.service'
+import { PageQuery } from 'src/constants'
+import { limitPageQuery } from 'src/shared/pipes/page-query.pipe'
+
+export type GetsByNameParam = PageQuery<GroupEntity, 'name' | 'createdTime' | 'id'> & {
+  name: string;
+}
+
+export const GetsByNameQueryPipe = limitPageQuery<GroupEntity>({
+  orderKeys: ['name', 'createdTime', 'id'],
+})
 
 export interface GroupRO {
   id: string;
@@ -22,19 +32,6 @@ export const defaultGroupRO: GroupRO = {
   owner: defaultUserRO,
 }
 
-interface GetableParams<K extends keyof GroupEntity> {
-  key: K;
-  value: string;
-  /**
-   * @default false
-   */
-  fuzzy?: boolean;
-  /**
-   * @default []
-   */
-  relations?: (keyof GroupEntity)[];
-}
-
 @Injectable()
 export class GroupService {
   constructor(
@@ -47,49 +44,32 @@ export class GroupService {
     private readonly userService: UserService,
   ) {}
 
-  async getEntities({
-    key,
-    value,
-    fuzzy = false,
-    relations = [],
-  }: GetableParams<'id' | 'name'>): Promise<GroupEntity[]> {
-    if (!value) {
-      throw new BadRequestException(`unknown value: ${value}`)
-    }
-    const searchableKeys: (keyof GroupEntity)[] = ['id', 'name']
-    if (!searchableKeys.includes(key)) {
-      throw new BadRequestException(`unknown key: ${key}`)
-    }
-    let datas: GroupEntity[] = []
-    if (fuzzy) {
-      datas = await this.groupRepo.find({
-        where: {
-          [key]: Like(`%${value}%`),
-        },
-        relations,
-      })
-    } else {
-      const res = await this.groupRepo.findOne({
-        where: {
-          [key]: value,
-        },
-        relations,
-      })
-      if (!res) {
-        throw new BadRequestException(`group not exist: [${key}: ${value}]`)
-      }
-      datas = [res]
-    }
-    return datas
+  async getById(id: string) {
+    return this.groupRepo.findOne({
+      where: {
+        id,
+      },
+      relations: ['owner', 'users'],
+    })
+  }
+
+  async getsByName({
+    page, size, order, name,
+  }: GetsByNameParam) {
+    return this.groupRepo.find({
+      where: {
+        name: Like(`%${name}%`),
+      },
+      skip: (page - 1) * size,
+      take: size,
+      order,
+      relations: ['owner'],
+    })
   }
 
   async create(dto: CreateGroupDto): Promise<string> {
     const newGroup = dangerousAssignSome(new GroupEntity(), dto, 'name', 'notice')
-    const users = await this.userService.getEntities({
-      key: 'id', value: dto.ownerId, relations: ['ownGroups']
-    })
-
-    newGroup.owner = users[0]
+    newGroup.owner = await this.userService.getById(dto.ownerId, ['ownGroups'])
 
     if (!newGroup.owner) {
       throw new Error('用户不存在')

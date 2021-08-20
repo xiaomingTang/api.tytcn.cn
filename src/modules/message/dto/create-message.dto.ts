@@ -1,12 +1,19 @@
+import { IsNotEmpty } from 'class-validator'
 import { MessageType } from 'src/constants'
 import { IsValidMessageType } from 'src/decorators/is-valid-message-type'
 
 export class CreateMessageDto {
+  @IsNotEmpty({
+    message: '消息内容不得为空',
+  })
   readonly content: string = '';
 
   @IsValidMessageType()
   readonly type: MessageType = MessageType.Text;
 
+  @IsNotEmpty({
+    message: '发送者id不得为空',
+  })
   readonly fromUserId: string = '';
 
   readonly toUserIds: string[] = [];

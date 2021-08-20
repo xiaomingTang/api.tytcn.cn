@@ -11,8 +11,8 @@ export class MessageController {
 
   @Get('id/:id')
   async getById(@Param('id') id: string) {
-    const datas = await this.messageService.getEntities({ key: 'id', value: id, fuzzy: false, relations: ['fromUser', 'toUsers', 'toGroups'] })
-    return datas.map((item) => this.messageService.buildRO(item))[0]
+    const data = await this.messageService.getById(id, ['fromUser', 'toUsers', 'toGroups'])
+    return this.messageService.buildRO(data)
   }
 
   @Get('list')

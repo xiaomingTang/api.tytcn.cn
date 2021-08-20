@@ -1,17 +1,17 @@
 import {
-  Body, Controller, Delete, Get, Param, Post, Put, UseGuards,
+  Body, Controller, Delete, Get, Param, Post, Put, Query,
 } from '@nestjs/common'
-import { Roles } from 'src/decorators/guard.decorator'
-import { RolesGuard } from 'src/guards/roles.guard'
+import { IsPublic } from 'src/decorators/guard.decorator'
 import { CreateUser } from './dto/create-user.dto'
 import { SignindDto } from './dto/signin.dto'
 import { UpdateUserInfoDto } from './dto/update-user-info.dto'
-import { UserService } from './user.service'
+import { GetsByNicknameParam, GetsByNicknameQueryPipe, UserService } from './user.service'
 
 @Controller('/api/user')
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
+  @IsPublic()
   @Post('signin')
   signin(@Body() dto: SignindDto) {
     return this.userService.signin(dto)
@@ -19,27 +19,25 @@ export class UserController {
 
   @Get('id/:id')
   async getById(@Param('id') id: string) {
-    const datas = await this.userService.getEntities({ key: 'id', value: id, fuzzy: false, relations: ['roles'] })
-    return datas.map((item) => this.userService.buildRO(item))[0]
+    const data = await this.userService.getById(id)
+    return this.userService.buildRO(data)
   }
 
-  // @Roles('admin')
-  // @UseGuards(RolesGuard)
   @Get('email/:email')
   async getByEmail(@Param('email') email: string) {
-    const datas = await this.userService.getEntities({ key: 'email', value: email, fuzzy: false, relations: ['roles'] })
-    return datas.map((item) => this.userService.buildRO(item))[0]
+    const data = await this.userService.getByEmail(email)
+    return this.userService.buildRO(data)
   }
 
   @Get('phone/:phone')
   async getByPhone(@Param('phone') phone: string) {
-    const datas = await this.userService.getEntities({ key: 'phone', value: phone, fuzzy: false, relations: ['roles'] })
-    return datas.map((item) => this.userService.buildRO(item))[0]
+    const data = await this.userService.getByPhone(phone)
+    return this.userService.buildRO(data)
   }
 
   @Get('nickname/:nickname')
-  async getsByNickname(@Param('nickname') nickname: string) {
-    const datas = await this.userService.getEntities({ key: 'nickname', value: nickname, fuzzy: true, relations: ['roles'] })
+  async getsByNickname(@Query(GetsByNicknameQueryPipe) query: GetsByNicknameParam) {
+    const datas = await this.userService.getsByNickname(query)
     return datas.map((item) => this.userService.buildRO(item))
   }
 

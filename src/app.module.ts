@@ -9,6 +9,8 @@ import { AuthModule } from './auth/auth.module'
 import { CoreModule } from './modules/core.module'
 import { GroupModule } from './modules/group/group.module'
 import { MessageModule } from './modules/message/message.module'
+import { JwtAuthGuard } from './guards/auth.guard'
+import { AuthCodeModule } from './modules/auth-code/auth-code.module'
 
 @Module({
   imports: [
@@ -21,11 +23,16 @@ import { MessageModule } from './modules/message/message.module'
     UserModule,
     GroupModule,
     MessageModule,
+    AuthCodeModule,
   ],
   providers: [
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard,
     },
   ],
 })

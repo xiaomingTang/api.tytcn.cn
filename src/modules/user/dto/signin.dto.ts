@@ -1,12 +1,24 @@
+import { IsNotEmpty } from 'class-validator'
+import { AccountType, SigninType } from 'src/constants'
+
 export class SignindDto {
-  readonly accountType: 'phone' | 'email' = 'phone';
+  @IsNotEmpty({
+    message: '账号类型不得为空',
+  })
+  readonly accountType: AccountType;
 
-  readonly signinType: 'password' | 'authCode' = 'password';
+  @IsNotEmpty({
+    message: '登录类型不得为空',
+  })
+  readonly signinType: SigninType;
 
+  @IsNotEmpty({
+    message: '账号不得为空',
+  })
   /**
-   * 登录账号, 可能是 email / phone / id
+   * 登录账号, 可能是 email / phone
    */
-  readonly account: string = '';
+  readonly account: string;
 
   /**
    * password or authCode

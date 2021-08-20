@@ -1,16 +1,26 @@
-import { BadRequestException, Inject, Injectable } from '@nestjs/common'
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { JwtService } from '@nestjs/jwt'
 import { Like, Repository } from 'typeorm'
 import { isEmail, isMobilePhone } from 'class-validator'
 
-import { RoleEntity, UserEntity } from 'src/entities'
+import { UserEntity } from 'src/entities'
 import { dangerousAssignSome, pick } from 'src/utils/object'
 import { CryptoUtil } from 'src/utils/crypto.util'
 import { CreateUser } from './dto/create-user.dto'
 import { UpdateUserInfoDto } from './dto/update-user-info.dto'
 import { SignindDto } from './dto/signin.dto'
-import { UserOnlineState } from 'src/constants'
+import { PageQuery, UserOnlineState } from 'src/constants'
+import { AuthCodeService } from '../auth-code/auth-code.service'
+import { limitPageQuery } from 'src/shared/pipes/page-query.pipe'
+
+export type GetsByNicknameParam = PageQuery<UserEntity, 'nickname' | 'updatedTime' | 'createdTime' | 'id'> & {
+  nickname: string;
+}
+
+export const GetsByNicknameQueryPipe = limitPageQuery<UserEntity>({
+  orderKeys: ['nickname', 'updatedTime', 'createdTime', 'id'],
+})
 
 export interface UserRO {
   id: string;
@@ -44,26 +54,13 @@ export const defaultUserRO: UserRO = {
   receivedMessages: [],
 }
 
-interface GetableParams<K extends keyof UserEntity> {
-  key: K;
-  value: string;
-  /**
-   * @default false
-   */
-  fuzzy?: boolean;
-  /**
-   * @default []
-   */
-  relations?: (keyof UserEntity)[];
-}
-
 @Injectable()
 export class UserService {
   constructor(
     @InjectRepository(UserEntity)
     private readonly userRepo: Repository<UserEntity>,
 
-    // @Inject(REQUEST) private readonly request: Request,
+    private readonly authCodeService: AuthCodeService,
 
     @Inject(CryptoUtil) private readonly cryptoUtil: CryptoUtil,
 
@@ -74,11 +71,7 @@ export class UserService {
 
   async initAdmin() {
     try {
-      await this.getEntities({
-        key: 'id',
-        value: 'admin',
-        fuzzy: false,
-      })
+      await this.getById('admin')
     } catch(err) {
       const adminId = await this.create({
         avatar: '',
@@ -97,71 +90,85 @@ export class UserService {
     }
   }
 
-  async getEntities({
-    key,
-    value,
-    fuzzy = false,
-    relations = [],
-  }: GetableParams<'id' | 'email' | 'phone' | 'nickname'>): Promise<UserEntity[]> {
-    if (!value) {
-      throw new BadRequestException(`unknown value: ${value}`)
-    }
-    const searchableKeys: (keyof UserEntity)[] = ['id', 'email', 'phone', 'nickname']
-    if (!searchableKeys.includes(key)) {
-      throw new BadRequestException(`unknown key: ${key}`)
-    }
-    let datas: UserEntity[] = []
-    if (fuzzy) {
-      datas = await this.userRepo.find({
-        where: {
-          [key]: Like(`%${value}%`),
-        },
-        relations,
-      })
-    } else {
-      const res = await this.userRepo.findOne({
-        where: {
-          [key]: value,
-        },
-        relations,
-      })
-      if (!res) {
-        throw new BadRequestException(`user not exist: [${key}: ${value}]`)
-      }
-      datas = [res]
-    }
-    return datas
+  async getById(id: string, relations: (keyof UserEntity)[] = ['roles']) {
+    return this.userRepo.findOne({
+      where: {
+        id,
+      },
+      relations,
+    })
+  }
+
+  async getByPhone(phone: string, relations: (keyof UserEntity)[] = ['roles']) {
+    return this.userRepo.findOne({
+      where: {
+        phone,
+      },
+      relations,
+    })
+  }
+
+  async getByEmail(email: string, relations: (keyof UserEntity)[] = ['roles']) {
+    return this.userRepo.findOne({
+      where: {
+        email,
+      },
+      relations,
+    })
+  }
+
+  async getsByNickname({
+    page, size, order, nickname,
+  }: GetsByNicknameParam) {
+    return this.userRepo.find({
+      where: {
+        nickname: Like(`%${nickname}%`),
+      },
+      skip: (page - 1) * size,
+      take: size,
+      order,
+      relations: ['owner'],
+    })
   }
 
   /**
    * @param account 登录账号, 可能是 email 或 phone 或 id
    */
   async signin({ accountType, account, signinType, code }: SignindDto): Promise<UserRO> {
-    const key: keyof UserEntity = accountType === 'email' ? 'email' : 'phone'
-    if (key === 'email' && !isEmail(account)) {
-      throw new BadRequestException('邮箱格式有误')
-    }
-    if (key === 'phone' && !isMobilePhone(account, 'zh-CN')) {
-      throw new BadRequestException('手机号格式有误')
-    }
+    let user: UserEntity
     const relations: (keyof UserEntity)[] = ['roles']
-    const users = await this.getEntities({
-      key,
-      value: account,
-      fuzzy: false,
-      relations,
-    }).catch(() => ([])) /* 阻止默认的报错, 下面是用自定义报错 */
-    const user = users[0]
+    if (accountType === 'email' && isEmail(account)) {
+      user = await this.getByEmail(account, relations)
+    }
+    if (accountType === 'phone' && isMobilePhone(account, 'zh-CN')) {
+      user = await this.getByPhone(account)
+    }
+    // 验证码登录
     if (signinType === 'authCode') {
+      // 未注册用户自动注册
       if (!user) {
-        throw new BadRequestException('账号或验证码有误: 账号不存在')
+        const newUserId = await this.create({
+          account,
+          accountType,
+          authCode: code,
+          avatar: '',
+          nickname: '',
+          password: '',
+        })
+        user = await this.getById(newUserId)
+      } else {
+        // 校验验证码
+        if (!await this.authCodeService.checkAuthCode({
+          account,
+          code,
+          codeType: 'signin',
+        })) {
+          throw new BadRequestException('账号或验证码有误: 验证码有误')
+        }
       }
-  
-      // @TODO: 验证码校验逻辑
-      if (code.length !== 4) {
-        throw new BadRequestException('账号或验证码有误: 验证码有误')
-      }
-    } else {
+    }
+    // 密码登录
+    if (signinType === 'passport') {
       if (!user) {
         throw new BadRequestException('账号或密码有误: 账号不存在')
       }
@@ -171,6 +178,11 @@ export class UserService {
       }
     }
 
+    if (!user) {
+      // 正常不会执行到这里
+      throw new NotFoundException('用户不存在')
+    }
+
     return {
       ...this.buildRO(user),
       token: this.generateJWT(user),
@@ -178,15 +190,17 @@ export class UserService {
   }
 
   async create({
-    accountType, account,
+    accountType, account, authCode,
     ...dto
   }: CreateUser): Promise<string> {
-    // @TODO: 验证 authCode
     const curUser = dangerousAssignSome(new UserEntity(), dto, 'avatar', 'nickname', 'password')
     switch (accountType) {
       case 'email':
         if (!isEmail(account)) {
           throw new BadRequestException('不是合法的邮箱')
+        }
+        if (await this.getByEmail(account)) {
+          throw new BadRequestException('账号已存在')
         }
         curUser.email = account
         break
@@ -194,21 +208,21 @@ export class UserService {
         if (!isMobilePhone(account, 'zh-CN')) {
           throw new BadRequestException('不是合法的手机号')
         }
+        if (await this.getByPhone(account)) {
+          throw new BadRequestException('账号已存在')
+        }
         curUser.phone = account
         break
       default:
         throw new BadRequestException(`unknown accountType: ${accountType}`)
     }
 
-    try {
-      if (await this.getEntities({
-        key: accountType,
-        value: account,
-      })) {
-        throw new Error('账号已存在')
-      }
-    } catch (error) {
-      // pass
+    if (!await this.authCodeService.checkAuthCode({
+      account,
+      code: authCode,
+      codeType: 'signin',
+    })) {
+      throw new BadRequestException('验证码有误')
     }
 
     const savedUser = await this.userRepo.save(curUser)
@@ -265,7 +279,8 @@ export class UserService {
       name: user.nickname,
       email: user.email,
       iat: now,
-      nbf: now,
+      // 防止过快的请求被拒绝
+      nbf: now - 1,
     })
   }
 }

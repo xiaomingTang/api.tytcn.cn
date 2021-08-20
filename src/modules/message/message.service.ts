@@ -2,7 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Like, Repository, getRepository } from 'typeorm'
 
-import { GroupEntity, MessageEntity, UserEntity } from 'src/entities'
+import { MessageEntity } from 'src/entities'
 import { dangerousAssignSome, pick } from 'src/utils/object'
 import { CreateMessageDto } from './dto/create-message.dto'
 import { defaultUserRO, UserRO, UserService } from '../user/user.service'
@@ -29,19 +29,6 @@ export const defaultMessageRO: MessageRO = {
   toGroups: [],
 }
 
-interface GetableParams<K extends keyof MessageEntity> {
-  key: K;
-  value: string;
-  /**
-   * @default false
-   */
-  fuzzy?: boolean;
-  /**
-   * @default []
-   */
-  relations?: (keyof MessageEntity)[];
-}
-
 @Injectable()
 export class MessageService {
   constructor(
@@ -52,40 +39,13 @@ export class MessageService {
     private readonly groupService: GroupService,
   ) {}
 
-  async getEntities({
-    key,
-    value,
-    fuzzy = false,
-    relations = [],
-  }: GetableParams<'id' | 'content'>): Promise<MessageEntity[]> {
-    if (!value) {
-      throw new BadRequestException(`unknown value: ${value}`)
-    }
-    const searchableKeys: (keyof MessageEntity)[] = ['id', 'content']
-    if (!searchableKeys.includes(key)) {
-      throw new BadRequestException(`unknown key: ${key}`)
-    }
-    let datas: MessageEntity[] = []
-    if (fuzzy) {
-      datas = await this.messageRepo.find({
-        where: {
-          [key]: Like(`%${value}%`),
-        },
-        relations,
-      })
-    } else {
-      const res = await this.messageRepo.findOne({
-        where: {
-          [key]: value,
-        },
-        relations,
-      })
-      if (!res) {
-        throw new BadRequestException(`message not exist: [${key}: ${value}]`)
-      }
-      datas = [res]
-    }
-    return datas
+  async getById(id: string, relations: (keyof MessageEntity)[] = []) {
+    return this.messageRepo.findOne({
+      where: {
+        id,
+      },
+      relations,
+    })
   }
 
   async getsByFuzzySearch(dto: GetMessagesDto): Promise<MessageEntity[]> {
@@ -113,29 +73,19 @@ export class MessageService {
   async create(dto: CreateMessageDto): Promise<string> {
     const newMessage = dangerousAssignSome(new MessageEntity(), dto, 'content', 'type')
 
-    newMessage.fromUser = (await this.userService.getEntities({
-      key: 'id',
-      value: dto.fromUserId,
-      relations: ['postedMessages'],
-    }))[0]
+    newMessage.fromUser = await this.userService.getById(dto.fromUserId, ['postedMessages'])
 
     const MAX_COUNT = 10
     if (dto.toUserIds.length > MAX_COUNT || dto.toGroupIds.length > MAX_COUNT) {
       throw new BadRequestException(`群发用户数或群组数不能超过 ${MAX_COUNT}`)
     }
     await asyncForEach(dto.toUserIds, async (id) => {
-      const targetUser = (await this.userService.getEntities({
-        key: 'id',
-        value: id,
-      }))[0]
+      const targetUser = await this.userService.getById(id)
       newMessage.toUsers = newMessage.toUsers ?? []
       newMessage.toUsers.push(targetUser)
     })
     await asyncForEach(dto.toGroupIds, async (id) => {
-      const targetGroup = (await this.groupService.getEntities({
-        key: 'id',
-        value: id,
-      }))[0]
+      const targetGroup = await this.groupService.getById(id)
       newMessage.toGroups = newMessage.toGroups ?? []
       newMessage.toGroups.push(targetGroup)
     })
