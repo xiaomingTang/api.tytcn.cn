@@ -1,58 +1,64 @@
 import {
   Body, Controller, Delete, Get, Param, Post, Put, Query,
 } from '@nestjs/common'
-import { IsPublic } from 'src/decorators/guard.decorator'
+import { IsPublic, Roles } from 'src/decorators/guard.decorator'
+import { formatPages } from 'src/utils/page'
 import { CreateUser } from './dto/create-user.dto'
 import { SignindDto } from './dto/signin.dto'
 import { UpdateUserInfoDto } from './dto/update-user-info.dto'
-import { GetsByNicknameParam, GetsByNicknameQueryPipe, UserService } from './user.service'
+import {
+  SearchUserParams, SearchUserQueryPipe, UserService,
+} from './user.service'
 
 @Controller('/api/user')
 export class UserController {
-  constructor(private readonly userService: UserService) {}
+  constructor(private readonly service: UserService) {}
 
   @IsPublic()
   @Post('signin')
   signin(@Body() dto: SignindDto) {
-    return this.userService.signin(dto)
+    return this.service.signin(dto)
   }
 
-  @Get('id/:id')
-  async getById(@Param('id') id: string) {
-    const data = await this.userService.getById(id)
-    return this.userService.buildRO(data)
+  @Roles('admin')
+  @Post('new')
+  async create(@Body() dto: CreateUser) {
+    const data = await this.service.create(dto)
+    return this.service.buildRO(data)
+  }
+
+  @Get('search')
+  async search(@Body(SearchUserQueryPipe) query: SearchUserParams) {
+    const datas = await this.service.search(query)
+    return formatPages(datas, this.service.buildRO)
   }
 
   @Get('email/:email')
   async getByEmail(@Param('email') email: string) {
-    const data = await this.userService.getByEmail(email)
-    return this.userService.buildRO(data)
+    const data = await this.service.getByEmail(email)
+    return this.service.buildRO(data)
   }
 
   @Get('phone/:phone')
   async getByPhone(@Param('phone') phone: string) {
-    const data = await this.userService.getByPhone(phone)
-    return this.userService.buildRO(data)
+    const data = await this.service.getByPhone(phone)
+    return this.service.buildRO(data)
   }
 
-  @Get('nickname/:nickname')
-  async getsByNickname(@Query(GetsByNicknameQueryPipe) query: GetsByNicknameParam) {
-    const datas = await this.userService.getsByNickname(query)
-    return datas.map((item) => this.userService.buildRO(item))
-  }
-
-  @Post('new')
-  async create(@Body() dto: CreateUser) {
-    return this.userService.create(dto)
+  @IsPublic()
+  @Get(':id')
+  async getById(@Param('id') id: string) {
+    const data = await this.service.getById(id)
+    return this.service.buildRO(data)
   }
 
   @Put(':id')
   async updateInfo(@Param('id') id: string, @Body() dto: UpdateUserInfoDto) {
-    return this.userService.updateInfo(id, dto)
+    return this.service.updateInfo(id, dto)
   }
 
   @Delete(':id')
   async delete(@Param('id') id: string) {
-    return this.userService.delete(id)
+    return this.service.delete(id)
   }
 }

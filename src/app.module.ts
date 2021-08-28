@@ -11,6 +11,7 @@ import { GroupModule } from './modules/group/group.module'
 import { MessageModule } from './modules/message/message.module'
 import { JwtAuthGuard } from './guards/auth.guard'
 import { AuthCodeModule } from './modules/auth-code/auth-code.module'
+import { RoleModule } from './modules/role/role.module'
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { AuthCodeModule } from './modules/auth-code/auth-code.module'
       limit: 10,
     }),
     CoreModule,
+    RoleModule,
     AuthModule,
     UserModule,
     GroupModule,

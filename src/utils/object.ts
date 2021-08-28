@@ -1,3 +1,5 @@
+type ObjectKey = string | number | symbol
+
 /**
  * !!! 注意, 该方法直接修改 target 参数
  * !!! 下面的第 2 条暂无法实现, 需要调用者自行注意, !!! 不要将类型不一致的 key 放到 keys 参数中
@@ -23,10 +25,19 @@ export function dangerousAssignSome<T extends Record<string, any>, S extends Rec
   return target
 }
 
-export function pick<T extends Record<string | number | symbol, any>, K extends keyof T>(obj: T, keys: K[]): Pick<T, K> {
+export function pick<T extends Record<ObjectKey, any>, K extends keyof T>(obj: T, keys: K[]): Pick<T, K> {
   const result = {} as Pick<T, K>
   keys.forEach((k) => {
     result[k] = obj[k]
   })
   return result
+}
+
+export function deleteUndefinedProperties<T extends Record<ObjectKey, any>>(obj: T): T {
+  Object.keys(obj).forEach((key) => {
+    if (obj[key] === undefined) {
+      delete obj[key]
+    }
+  })
+  return obj
 }

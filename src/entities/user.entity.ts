@@ -12,6 +12,11 @@ import { BaseEntityWithPublicId } from './base.entity'
 
 @Entity()
 export class UserEntity extends BaseEntityWithPublicId {
+  @BeforeInsert()
+  private async hashPassword() {
+    this.password = createHash('sha256').update(this.password).digest('hex')
+  }
+
   @Column({
     default: '',
   })
@@ -33,11 +38,6 @@ export class UserEntity extends BaseEntityWithPublicId {
     default: '',
   })
   password: string
-
-  @BeforeInsert()
-  async hashPassword() {
-    this.password = createHash('sha256').update(this.password).digest('hex')
-  }
 
   @Column({
     default: '',

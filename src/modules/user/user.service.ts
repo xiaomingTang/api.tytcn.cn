@@ -1,26 +1,19 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { JwtService } from '@nestjs/jwt'
-import { Like, Repository } from 'typeorm'
+import { Between, Like, Repository } from 'typeorm'
 import { isEmail, isMobilePhone } from 'class-validator'
 
 import { UserEntity } from 'src/entities'
-import { dangerousAssignSome, pick } from 'src/utils/object'
+import { dangerousAssignSome, deleteUndefinedProperties, pick } from 'src/utils/object'
 import { CryptoUtil } from 'src/utils/crypto.util'
 import { CreateUser } from './dto/create-user.dto'
 import { UpdateUserInfoDto } from './dto/update-user-info.dto'
 import { SignindDto } from './dto/signin.dto'
-import { PageQuery, UserOnlineState } from 'src/constants'
+import { ADMIN_ID, ADMIN_PHONE, CREATE_ADMIN_BY_EMAIL_OBJ, UserOnlineState } from 'src/constants'
 import { AuthCodeService } from '../auth-code/auth-code.service'
 import { limitPageQuery } from 'src/shared/pipes/page-query.pipe'
-
-export type GetsByNicknameParam = PageQuery<UserEntity, 'nickname' | 'updatedTime' | 'createdTime' | 'id'> & {
-  nickname: string;
-}
-
-export const GetsByNicknameQueryPipe = limitPageQuery<UserEntity>({
-  orderKeys: ['nickname', 'updatedTime', 'createdTime', 'id'],
-})
+import { genePageRes, PageQuery, PageRes } from 'src/utils/page'
 
 export interface UserRO {
   id: string;
@@ -54,38 +47,52 @@ export const defaultUserRO: UserRO = {
   receivedMessages: [],
 }
 
+export type SearchUserParams = PageQuery<
+  UserEntity,
+  'id' | 'nickname' | 'phone' | 'email' | 'onlineState' | 'createdTime' | 'updatedTime' | 'roles'
+> & {
+  id?: string;
+  nickname?: string;
+  phone?: string;
+  email?: string;
+  onlineState?: UserOnlineState;
+  createdTime?: [number, number];
+  updatedTime?: [number, number];
+  roles?: string[];
+}
+
+export const SearchUserQueryPipe = limitPageQuery<UserEntity>({
+  orderKeys: ['id', 'nickname', 'phone', 'email', 'onlineState', 'createdTime', 'updatedTime', 'roles'],
+})
+
 @Injectable()
 export class UserService {
   constructor(
     @InjectRepository(UserEntity)
     private readonly userRepo: Repository<UserEntity>,
 
-    private readonly authCodeService: AuthCodeService,
+    @Inject(CryptoUtil)
+    private readonly cryptoUtil: CryptoUtil,
 
-    @Inject(CryptoUtil) private readonly cryptoUtil: CryptoUtil,
+    private readonly authCodeService: AuthCodeService,
 
     private readonly jwtService: JwtService,
   ) {
-    this.initAdmin()
+    this.initAdminUser()
   }
 
-  async initAdmin() {
+  async initAdminUser() {
     try {
-      await this.getById('admin')
+      if (!await this.getById(ADMIN_ID)) {
+        throw new Error('no admin user')
+      }
     } catch(err) {
-      const adminId = await this.create({
-        avatar: '',
-        nickname: 'admin',
-        password: 'xiaoming1992',
-        authCode: '',
-        accountType: 'email',
-        account: '1038761793@qq.com',
-      })
+      const { id: adminId } = await this.create(CREATE_ADMIN_BY_EMAIL_OBJ, true)
       await this.userRepo.update({
         id: adminId,
       }, {
-        id: 'admin',
-        phone: '17620307415',
+        id: ADMIN_ID,
+        phone: ADMIN_PHONE,
       })
     }
   }
@@ -117,17 +124,48 @@ export class UserService {
     })
   }
 
-  async getsByNickname({
-    page, size, order, nickname,
-  }: GetsByNicknameParam) {
-    return this.userRepo.find({
-      where: {
-        nickname: Like(`%${nickname}%`),
-      },
-      skip: (page - 1) * size,
-      take: size,
-      order,
-      relations: ['owner'],
+  /**
+   * string 空值为 undefined 或 空字符串
+   * array 空值为 undefined 或 []
+   * 空值 时表示不限
+   */
+  async search({
+    current, pageSize, order,
+    id = '', nickname = '', phone = '', email = '', onlineState,
+    createdTime, updatedTime, roles,
+  }: SearchUserParams): Promise<PageRes<UserEntity>> {
+    return this.userRepo.findAndCount({
+      where: deleteUndefinedProperties({
+        id: !id ? undefined : Like(`%${id}%`),
+        nickname: !nickname ? undefined : Like(`%${nickname}%`),
+        phone: !phone ? undefined : Like(`%${phone}%`),
+        email: !email ? undefined : Like(`%${email}%`),
+        createdTime: !createdTime ? undefined : Between(...createdTime),
+        updatedTime: !updatedTime ? undefined : Between(...updatedTime),
+        onlineState: !onlineState ? undefined : onlineState,
+        // roles: !(roles && roles.length > 0) ? undefined : Raw((alias) => `${'role.name'} @> ARRAY[:...roles]`, { roles }),
+        // @TODO: 需要增加 roles 查询
+        // roles: !(roles && roles.length > 0) ? undefined : {
+        //   name: In(roles),
+        // },
+      }),
+      // join: {
+      //   alias: 'role',
+      //   innerJoinAndSelect: {
+      //     'user': 'user',
+      //   }
+      // },
+      skip: (current - 1) * pageSize,
+      take: pageSize,
+      order: deleteUndefinedProperties(order),
+      relations: ['roles'],
+    }).then(([entities, total]) => {
+      return genePageRes(entities, {
+        data: entities,
+        current,
+        pageSize,
+        total,
+      })
     })
   }
 
@@ -147,7 +185,7 @@ export class UserService {
     if (signinType === 'authCode') {
       // 未注册用户自动注册
       if (!user) {
-        const newUserId = await this.create({
+        user = await this.create({
           account,
           accountType,
           authCode: code,
@@ -155,7 +193,6 @@ export class UserService {
           nickname: '',
           password: '',
         })
-        user = await this.getById(newUserId)
       } else {
         // 校验验证码
         if (!await this.authCodeService.checkAuthCode({
@@ -167,8 +204,9 @@ export class UserService {
         }
       }
     }
+
     // 密码登录
-    if (signinType === 'passport') {
+    if (signinType === 'password') {
       if (!user) {
         throw new BadRequestException('账号或密码有误: 账号不存在')
       }
@@ -192,7 +230,7 @@ export class UserService {
   async create({
     accountType, account, authCode,
     ...dto
-  }: CreateUser): Promise<string> {
+  }: CreateUser, ignoreAuth = false): Promise<UserEntity> {
     const curUser = dangerousAssignSome(new UserEntity(), dto, 'avatar', 'nickname', 'password')
     switch (accountType) {
       case 'email':
@@ -217,7 +255,7 @@ export class UserService {
         throw new BadRequestException(`unknown accountType: ${accountType}`)
     }
 
-    if (!await this.authCodeService.checkAuthCode({
+    if (!ignoreAuth && !await this.authCodeService.checkAuthCode({
       account,
       code: authCode,
       codeType: 'signin',
@@ -225,8 +263,7 @@ export class UserService {
       throw new BadRequestException('验证码有误')
     }
 
-    const savedUser = await this.userRepo.save(curUser)
-    return savedUser.id
+    return this.userRepo.save(curUser)
   }
 
   async updateInfo(id: string, dto: UpdateUserInfoDto): Promise<boolean> {

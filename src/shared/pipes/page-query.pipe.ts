@@ -1,6 +1,6 @@
-import { PageQuery } from 'src/constants'
 import { BaseEntityWithPublicId } from 'src/entities/base.entity'
 import { pick } from 'src/utils/object'
+import { PageQuery } from 'src/utils/page'
 
 export function limitPageQuery<E extends BaseEntityWithPublicId>({
   size = 20,
@@ -16,9 +16,9 @@ export function limitPageQuery<E extends BaseEntityWithPublicId>({
       try {
         const ret: T = {
           ...value,
-          page: Math.max(value.page, 1),
-          size: Math.min(value.size, size),
-          order: pick(value.order, orderKeys),
+          current: Math.max(value.current ?? 0, 1),
+          pageSize: Math.min(value.pageSize ?? 20, size),
+          order: pick((value.order || {}) as Required<T>['order'], orderKeys),
         }
         return ret
       } catch (err) {

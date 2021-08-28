@@ -1,4 +1,4 @@
-import { Column, Entity, ManyToMany } from 'typeorm'
+import { Column, Entity, ManyToMany, OneToOne } from 'typeorm'
 import { BaseEntityWithPrivateId } from './base.entity'
 import { UserEntity } from './user.entity'
 
@@ -7,9 +7,12 @@ export class RoleEntity extends BaseEntityWithPrivateId {
   @Column({ unique: true, default: '' })
   name: string
 
-  @Column({ default: '描述' })
+  @Column({ default: '暂无描述' })
   description: string
 
+  @OneToOne(() => UserEntity)
+  createdBy: UserEntity;
+
   @ManyToMany(() => UserEntity, (u) => u.roles)
-  users?: UserEntity
+  users?: UserEntity[]
 }

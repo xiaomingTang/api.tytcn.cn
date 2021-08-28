@@ -1,22 +1,14 @@
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { Like, Repository } from 'typeorm'
+import { Between, Like, Repository } from 'typeorm'
 
 import { GroupEntity, UserEntity } from 'src/entities'
-import { dangerousAssignSome, pick } from 'src/utils/object'
+import { dangerousAssignSome, deleteUndefinedProperties, pick } from 'src/utils/object'
 import { CreateGroupDto } from './dto/create-group.dto'
 import { UpdateGroupInfoDto } from './dto/update-group-info.dto'
 import { defaultUserRO, UserRO, UserService } from '../user/user.service'
-import { PageQuery } from 'src/constants'
 import { limitPageQuery } from 'src/shared/pipes/page-query.pipe'
-
-export type GetsByNameParam = PageQuery<GroupEntity, 'name' | 'createdTime' | 'id'> & {
-  name: string;
-}
-
-export const GetsByNameQueryPipe = limitPageQuery<GroupEntity>({
-  orderKeys: ['name', 'createdTime', 'id'],
-})
+import { genePageRes, PageQuery, PageRes } from 'src/utils/page'
 
 export interface GroupRO {
   id: string;
@@ -32,6 +24,20 @@ export const defaultGroupRO: GroupRO = {
   owner: defaultUserRO,
 }
 
+export type SearchGroupParams = PageQuery<
+  GroupEntity,
+  'id' | 'name' | 'createdTime'
+> & {
+  id?: string;
+  name?: string;
+  createdTime?: [number, number];
+  ownerId?: string;
+}
+
+export const SearchGroupQueryPipe = limitPageQuery<GroupEntity>({
+  orderKeys: ['id', 'name', 'createdTime'],
+})
+
 @Injectable()
 export class GroupService {
   constructor(
@@ -44,26 +50,42 @@ export class GroupService {
     private readonly userService: UserService,
   ) {}
 
-  async getById(id: string) {
+  async getById(id: string, relations: (keyof GroupEntity)[] = ['owner', 'users']) {
     return this.groupRepo.findOne({
       where: {
         id,
       },
-      relations: ['owner', 'users'],
+      relations,
     })
   }
 
-  async getsByName({
-    page, size, order, name,
-  }: GetsByNameParam) {
-    return this.groupRepo.find({
-      where: {
-        name: Like(`%${name}%`),
-      },
-      skip: (page - 1) * size,
-      take: size,
-      order,
+  /**
+   * string 空值为 undefined 或 空字符串
+   * array 空值为 undefined 或 []
+   * 空值 时表示不限
+   */
+  async search({
+    current, pageSize, order,
+    id = '', name = '', createdTime, ownerId,
+  }: SearchGroupParams): Promise<PageRes<GroupEntity>> {
+    return this.groupRepo.findAndCount({
+      where: deleteUndefinedProperties({
+        id: !id ? undefined : Like(`%${id}%`),
+        name: !name ? undefined : Like(`%${name}%`),
+        createdTime: !createdTime ? undefined : Between(...createdTime),
+        // @TODO: 新增搜索 ownerId
+      }),
+      skip: (current - 1) * pageSize,
+      take: pageSize,
+      order: deleteUndefinedProperties(order),
       relations: ['owner'],
+    }).then(([entities, total]) => {
+      return genePageRes(entities, {
+        data: entities,
+        current,
+        pageSize,
+        total,
+      })
     })
   }
 

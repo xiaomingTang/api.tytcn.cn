@@ -1,14 +1,19 @@
 import { TypeOrmModuleOptions } from '@nestjs/typeorm'
-import { FindManyOptions } from 'typeorm'
-import { BaseEntityWithPublicId } from 'src/entities/base.entity'
+import { CreateUser } from 'src/modules/user/dto/create-user.dto'
 
 export const JWT_SECRET = 'my-nest-app-secret-1992'
+
+export const JWT_EXPIRES_IN = '3600s'
 
 export const IS_PUBLIC_KEY = 'is-public'
 
 export const ROLES_KEY = 'roles'
 
-export const JWT_EXPIRES_IN = '3600s'
+export type AccountType = 'phone' | 'email'
+
+export type CodeType = 'signin'
+
+export type SigninType = 'password' | 'authCode' | 'qrcode'
 
 export enum UserOnlineState {
   On = 'On',
@@ -28,29 +33,24 @@ export const TypeOrmConfig: TypeOrmModuleOptions = {
   port: 3306,
   username: 'root',
   password: '123456',
-  database: 'chat-room',
+  database: 'a',
   charset: 'utf8mb4', // 设置 chatset 编码为 utf8mb4
   autoLoadEntities: true,
   synchronize: true, // @WARNING 不应在生产中使用设置, 否则可能会丢失生产数据
   // entities: ["dist/entities/*.entity{.ts,.js}"],
 }
 
-export type AccountType = 'phone' | 'email'
+export const ADMIN_ROLE_NAME = 'admin'
+export const ADMIN_ID = 'admin'
+export const ADMIN_PHONE = '17620307415'
+export const ADMIN_EMAIL = '1038761793@qq.com'
+const ADMIN_PASSWORD = 'xiaoming1992'
 
-export type CodeType = 'signin'
-
-export type SigninType = 'passport' | 'authCode' | 'qrcode'
-
-export interface PageQuery<Entity extends BaseEntityWithPublicId, K extends keyof Entity> {
-  page: number;
-  size: number;
-  order: Record<K, 'ASC' | 'DESC'>;
-}
-
-export interface PageRes<T> {
-  data: T[];
-  page: number;
-  size: number;
-  total: number;
-  more: boolean;
+export const CREATE_ADMIN_BY_EMAIL_OBJ: CreateUser = {
+  avatar: '/icon.png',
+  nickname: 'admin',
+  password: ADMIN_PASSWORD,
+  authCode: '',
+  accountType: 'email',
+  account: ADMIN_EMAIL,
 }

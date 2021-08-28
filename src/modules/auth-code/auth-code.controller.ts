@@ -7,12 +7,12 @@ import { CreateAuthCodeDto } from './dto/create-auth-code.dto'
 
 @Controller('/api/auth-code')
 export class AuthCodeController {
-  constructor(private readonly authCodeService: AuthCodeService) {}
+  constructor(private readonly service: AuthCodeService) {}
 
   // @TODO: 调用频率需要额外限制
   @IsPublic()
   @Post('new')
   async createAuthCode(@Body() dto: CreateAuthCodeDto) {
-    return this.authCodeService.create(dto)
+    return this.service.create(dto)
   }
 }

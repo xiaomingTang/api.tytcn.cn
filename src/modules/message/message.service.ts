@@ -1,15 +1,16 @@
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { Like, Repository, getRepository } from 'typeorm'
+import { Like, Repository, Between } from 'typeorm'
 
 import { MessageEntity } from 'src/entities'
-import { dangerousAssignSome, pick } from 'src/utils/object'
+import { dangerousAssignSome, deleteUndefinedProperties, pick } from 'src/utils/object'
 import { CreateMessageDto } from './dto/create-message.dto'
 import { defaultUserRO, UserRO, UserService } from '../user/user.service'
 import { MessageType } from 'src/constants'
-import { GetMessagesDto } from './dto/get-messages.dto'
 import { asyncForEach } from 'src/utils/array'
 import { GroupRO, GroupService } from '../group/group.service'
+import { genePageRes, PageQuery, PageRes } from 'src/utils/page'
+import { limitPageQuery } from 'src/shared/pipes/page-query.pipe'
 
 export interface MessageRO {
   id: string;
@@ -28,6 +29,23 @@ export const defaultMessageRO: MessageRO = {
   toUsers: [],
   toGroups: [],
 }
+
+export type SearchMessageParams = PageQuery<
+  MessageEntity,
+  'id' | 'content' | 'type' | 'createdTime'
+> & {
+  id?: string;
+  content?: string;
+  type?: MessageType;
+  createdTime?: [number, number];
+  fromUserId?: string;
+  toUserId?: string;
+  toGroupId?: string;
+}
+
+export const SearchMessageQueryPipe = limitPageQuery<MessageEntity>({
+  orderKeys: ['id', 'content', 'type', 'createdTime', 'fromUser'],
+})
 
 @Injectable()
 export class MessageService {
@@ -48,29 +66,41 @@ export class MessageService {
     })
   }
 
-  async getsByFuzzySearch(dto: GetMessagesDto): Promise<MessageEntity[]> {
-    const contentConvertedDto = pick(dto, ['content', 'fromUserId', 'toGroupId', 'toUserId', 'type'])
-    contentConvertedDto.content = `%${contentConvertedDto.content}%`
-
-    const queryStr = [
-      dto.fromUserId && 'fromUser.id = :fromUserId',
-      dto.toUserId && ':toUserId = toUser.id',
-      dto.toGroupId && ':toGroupId = toGroup.id',
-      dto.type && 'type = :type',
-      dto.content && 'content like :content',
-    ].filter(Boolean).join(' AND ')
-
-    const messages = await getRepository(MessageEntity)
-      .createQueryBuilder('message')
-      .where(queryStr, contentConvertedDto)
-      .leftJoinAndSelect('message.fromUser', 'fromUser')
-      .leftJoin('message.toUsers', 'toUser')
-      .leftJoin('message.toGroups', 'toGroup')
-      .getMany()
-    return messages
+  /**
+   * string 空值为 undefined 或 空字符串
+   * array 空值为 undefined 或 []
+   * 空值 时表示不限
+   */
+  async search({
+    current, pageSize, order,
+    id = '', content = '', type,
+    createdTime, fromUserId, toUserId, toGroupId,
+  }: SearchMessageParams): Promise<PageRes<MessageEntity>> {
+    return this.messageRepo.findAndCount({
+      where: deleteUndefinedProperties({
+        id: !id ? undefined : Like(`%${id}%`),
+        content: !content ? undefined : Like(`%${content}%`),
+        createdTime: !createdTime ? undefined : Between(...createdTime),
+        type: !type ? undefined : type,
+        // @TODO: 需要增加 fromUserId, toUserId, toGroupId 查询
+        // 其中当请求者是 admin 时, fromUser 有效
+        // 当请求者不是 admin 时, fromUser 为请求者的 id
+      }),
+      skip: (current - 1) * pageSize,
+      take: pageSize,
+      order: deleteUndefinedProperties(order),
+      relations: ['fromUser'],
+    }).then(([entities, total]) => {
+      return genePageRes(entities, {
+        data: entities,
+        current,
+        pageSize,
+        total,
+      })
+    })
   }
 
-  async create(dto: CreateMessageDto): Promise<string> {
+  async create(dto: CreateMessageDto): Promise<MessageEntity> {
     const newMessage = dangerousAssignSome(new MessageEntity(), dto, 'content', 'type')
 
     newMessage.fromUser = await this.userService.getById(dto.fromUserId, ['postedMessages'])
@@ -91,8 +121,7 @@ export class MessageService {
     })
 
     try {
-      const savedMessage = await this.messageRepo.save(newMessage)
-      return savedMessage.id
+      return this.messageRepo.save(newMessage)
     } catch (error) {
       throw new BadRequestException(`消息发送失败: ${error.message}`)
     }
