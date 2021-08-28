@@ -58,12 +58,16 @@ export class MessageService {
   ) {}
 
   async getById(id: string, relations: (keyof MessageEntity)[] = []) {
-    return this.messageRepo.findOne({
+    const message = await this.messageRepo.findOne({
       where: {
         id,
       },
       relations,
     })
+    if (!message) {
+      throw new BadRequestException('消息不存在')
+    }
+    return message
   }
 
   /**

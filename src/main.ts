@@ -12,7 +12,12 @@ async function bootstrap() {
   
   const config = new DocumentBuilder()
     .setTitle('tytcn.cn 后端 api 接口文档')
-    .setDescription('tytcn.cn 后端 api')
+    .setDescription(`
+      dev:
+        前端: http://localhost:8080/chatRoom/user/admin
+        后端: http://localhost:3000/api/
+        文档: http://localhost:3000/doc/
+    `)
     .setVersion('0.0.1')
     .addBearerAuth()
     .build()

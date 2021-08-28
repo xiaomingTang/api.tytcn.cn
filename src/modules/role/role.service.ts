@@ -65,21 +65,29 @@ export class RoleService {
   }
 
   async getById(id: string, relations: (keyof RoleEntity)[] = []) {
-    return this.roleRepo.findOne({
+    const role = await this.roleRepo.findOne({
       where: {
         id,
       },
       relations,
     })
+    if (!role) {
+      throw new BadRequestException('角色不存在')
+    }
+    return role
   }
 
   async getByName(name: string, relations: (keyof RoleEntity)[] = []) {
-    return this.roleRepo.findOne({
+    const role = await this.roleRepo.findOne({
       where: {
         name,
       },
       relations,
     })
+    if (!role) {
+      throw new BadRequestException('角色不存在')
+    }
+    return role
   }
 
   /**

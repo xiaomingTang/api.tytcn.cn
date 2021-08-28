@@ -51,12 +51,16 @@ export class GroupService {
   ) {}
 
   async getById(id: string, relations: (keyof GroupEntity)[] = ['owner', 'users']) {
-    return this.groupRepo.findOne({
+    const group = await this.groupRepo.findOne({
       where: {
         id,
       },
       relations,
     })
+    if (!group) {
+      throw new BadRequestException('群组不存在')
+    }
+    return group
   }
 
   /**

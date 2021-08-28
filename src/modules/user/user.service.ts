@@ -98,30 +98,42 @@ export class UserService {
   }
 
   async getById(id: string, relations: (keyof UserEntity)[] = ['roles']) {
-    return this.userRepo.findOne({
+    const user = await this.userRepo.findOne({
       where: {
         id,
       },
       relations,
     })
+    if (!user) {
+      throw new BadRequestException('用户不存在')
+    }
+    return user
   }
 
   async getByPhone(phone: string, relations: (keyof UserEntity)[] = ['roles']) {
-    return this.userRepo.findOne({
+    const user = await this.userRepo.findOne({
       where: {
         phone,
       },
       relations,
     })
+    if (!user) {
+      throw new BadRequestException('用户不存在')
+    }
+    return user
   }
 
   async getByEmail(email: string, relations: (keyof UserEntity)[] = ['roles']) {
-    return this.userRepo.findOne({
+    const user = await this.userRepo.findOne({
       where: {
         email,
       },
       relations,
     })
+    if (!user) {
+      throw new BadRequestException('用户不存在')
+    }
+    return user
   }
 
   /**
