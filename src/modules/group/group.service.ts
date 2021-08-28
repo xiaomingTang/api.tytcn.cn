@@ -67,7 +67,7 @@ export class GroupService {
   async search({
     current, pageSize, order,
     id = '', name = '', createdTime, ownerId,
-  }: SearchGroupParams): Promise<PageRes<GroupEntity>> {
+  }: SearchGroupParams, relations: (keyof GroupEntity)[] = ['owner']): Promise<PageRes<GroupEntity>> {
     return this.groupRepo.findAndCount({
       where: deleteUndefinedProperties({
         id: !id ? undefined : Like(`%${id}%`),
@@ -78,7 +78,7 @@ export class GroupService {
       skip: (current - 1) * pageSize,
       take: pageSize,
       order: deleteUndefinedProperties(order),
-      relations: ['owner'],
+      relations,
     }).then(([entities, total]) => {
       return genePageRes(entities, {
         data: entities,

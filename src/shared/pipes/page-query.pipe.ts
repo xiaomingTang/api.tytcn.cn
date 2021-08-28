@@ -3,22 +3,22 @@ import { pick } from 'src/utils/object'
 import { PageQuery } from 'src/utils/page'
 
 export function limitPageQuery<E extends BaseEntityWithPublicId>({
-  size = 20,
-  orderKeys = ['createdTime', 'updatedTime', 'id'],
+  pageSize = 20,
+  orderKeys = ['id', 'createdTime', 'updatedTime'],
 }: {
-  size?: number;
+  pageSize?: number;
   orderKeys?: (keyof E)[];
 }) {
   type T = PageQuery<E, keyof E>
 
   return {
-    transform(value: T, metadata: any): T {
+    transform(value: Partial<T>, metadata: any): T {
       try {
         const ret: T = {
           ...value,
           current: Math.max(value.current ?? 0, 1),
-          pageSize: Math.min(value.pageSize ?? 20, size),
-          order: pick((value.order || {}) as Required<T>['order'], orderKeys),
+          pageSize: Math.min(value.pageSize ?? 20, pageSize),
+          order: pick((value.order ?? {}) as T['order'], orderKeys),
         }
         return ret
       } catch (err) {

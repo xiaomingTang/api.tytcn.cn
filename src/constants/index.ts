@@ -9,11 +9,20 @@ export const IS_PUBLIC_KEY = 'is-public'
 
 export const ROLES_KEY = 'roles'
 
-export type AccountType = 'phone' | 'email'
+export enum AccountType {
+  phone = 'phone',
+  email = 'email',
+}
 
-export type CodeType = 'signin'
+export enum CodeType {
+  signin = 'signin',
+}
 
-export type SigninType = 'password' | 'authCode' | 'qrcode'
+export enum SigninType {
+  password = 'password',
+  authCode = 'authCode',
+  qrcode = 'qrcode',
+}
 
 export enum UserOnlineState {
   On = 'On',
@@ -51,6 +60,6 @@ export const CREATE_ADMIN_BY_EMAIL_OBJ: CreateUser = {
   nickname: 'admin',
   password: ADMIN_PASSWORD,
   authCode: '',
-  accountType: 'email',
+  accountType: AccountType.email,
   account: ADMIN_EMAIL,
 }

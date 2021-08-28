@@ -20,8 +20,11 @@ export class SignindDto {
    */
   readonly account: string;
 
+  @IsNotEmpty({
+    message: '密码或验证码不得为空',
+  })
   /**
    * password or authCode
    */
-  readonly code: string = '';
+  readonly code: string;
 }

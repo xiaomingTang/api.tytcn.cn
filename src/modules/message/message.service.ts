@@ -75,7 +75,7 @@ export class MessageService {
     current, pageSize, order,
     id = '', content = '', type,
     createdTime, fromUserId, toUserId, toGroupId,
-  }: SearchMessageParams): Promise<PageRes<MessageEntity>> {
+  }: SearchMessageParams, relations: (keyof MessageEntity)[] = ['fromUser']): Promise<PageRes<MessageEntity>> {
     return this.messageRepo.findAndCount({
       where: deleteUndefinedProperties({
         id: !id ? undefined : Like(`%${id}%`),
@@ -89,7 +89,7 @@ export class MessageService {
       skip: (current - 1) * pageSize,
       take: pageSize,
       order: deleteUndefinedProperties(order),
-      relations: ['fromUser'],
+      relations,
     }).then(([entities, total]) => {
       return genePageRes(entities, {
         data: entities,

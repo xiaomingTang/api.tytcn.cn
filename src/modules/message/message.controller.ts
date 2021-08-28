@@ -12,7 +12,7 @@ export class MessageController {
   @Get('search')
   async search(@Body(SearchMessageQueryPipe) query: SearchMessageParams) {
     const datas = await this.service.search(query)
-    return formatPages(datas, this.service.buildRO)
+    return formatPages(datas, this.service.buildRO.bind(this.service))
   }
 
   @Post('new')

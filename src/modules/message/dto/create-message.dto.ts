@@ -6,17 +6,17 @@ export class CreateMessageDto {
   @IsNotEmpty({
     message: '消息内容不得为空',
   })
-  readonly content: string = '';
+  readonly content: string;
 
   @IsValidMessageType()
-  readonly type: MessageType = MessageType.Text;
+  readonly type: MessageType;
 
   @IsNotEmpty({
     message: '发送者id不得为空',
   })
-  readonly fromUserId: string = '';
+  readonly fromUserId: string;
 
-  readonly toUserIds: string[] = [];
+  readonly toUserIds: string[];
 
-  readonly toGroupIds: string[] = [];
+  readonly toGroupIds: string[];
 }

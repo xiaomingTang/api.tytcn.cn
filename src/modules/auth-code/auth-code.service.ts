@@ -23,9 +23,9 @@ export const defaultAuthCodeRO: AuthCodeRO = {
 
   code: '',
 
-  accountType: 'phone',
+  accountType: AccountType.phone,
 
-  codeType: 'signin',
+  codeType: CodeType.signin,
 }
 
 @Injectable()

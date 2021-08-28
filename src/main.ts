@@ -1,5 +1,6 @@
 import * as helmet from 'helmet'
 import { NestFactory } from '@nestjs/core'
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger'
 import { AppModule } from './app.module'
 import { AllExceptionFilter } from './filters/all-exception.filter'
 import { HttpExceptionFilter } from './filters/http-exception.filter'
@@ -8,6 +9,15 @@ import { ValidationPipe } from './shared/pipes/validation.pipe'
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule)
+  
+  const config = new DocumentBuilder()
+    .setTitle('tytcn.cn 后端 api 接口文档')
+    .setDescription('tytcn.cn 后端 api')
+    .setVersion('0.0.1')
+    .addBearerAuth()
+    .build()
+  const document = SwaggerModule.createDocument(app, config)
+  SwaggerModule.setup('doc', app, document)
 
   /**
    * Helmet can help protect your app from some well-known
@@ -36,7 +46,7 @@ async function bootstrap() {
 
   await app.listen(3000)
 
-  console.log(`run at ${await app.getUrl()}/user/`)
+  console.log(`run at ${await app.getUrl()}/`)
 }
 
 bootstrap()

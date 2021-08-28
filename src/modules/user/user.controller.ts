@@ -1,5 +1,5 @@
 import {
-  Body, Controller, Delete, Get, Param, Post, Put, Query,
+  Body, Controller, Delete, Get, Param, Post, Put,
 } from '@nestjs/common'
 import { IsPublic, Roles } from 'src/decorators/guard.decorator'
 import { formatPages } from 'src/utils/page'
@@ -30,7 +30,7 @@ export class UserController {
   @Get('search')
   async search(@Body(SearchUserQueryPipe) query: SearchUserParams) {
     const datas = await this.service.search(query)
-    return formatPages(datas, this.service.buildRO)
+    return formatPages(datas, this.service.buildRO.bind(this.service))
   }
 
   @Get('email/:email')

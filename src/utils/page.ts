@@ -3,7 +3,7 @@ import { BaseEntityWithPublicId } from 'src/entities/base.entity'
 export interface PageQuery<Entity extends BaseEntityWithPublicId, K extends keyof Entity> {
   current: number;
   pageSize: number;
-  order?: Partial<Record<K, 'ASC' | 'DESC'>>;
+  order: Partial<Record<K, 'ASC' | 'DESC'>>;
 }
 
 export interface PageRes<T> {

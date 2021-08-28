@@ -13,7 +13,7 @@ export class GroupController {
   @Get('search')
   async search(@Body(SearchGroupQueryPipe) query: SearchGroupParams) {
     const datas = await this.service.search(query)
-    return formatPages(datas, this.service.buildRO)
+    return formatPages(datas, this.service.buildRO.bind(this.service))
   }
 
   @Post('new')

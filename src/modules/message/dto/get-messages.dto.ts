@@ -1,13 +1,13 @@
 import { MessageType } from 'src/constants'
 
 export class GetMessagesDto {
-  fromUserId?: string;
+  readonly fromUserId?: string;
 
-  toUserId?: string;
+  readonly toUserId?: string;
 
-  toGroupId?: string;
+  readonly toGroupId?: string;
 
-  content?: string;
+  readonly content?: string;
 
-  type?: MessageType;
+  readonly type?: MessageType;
 }

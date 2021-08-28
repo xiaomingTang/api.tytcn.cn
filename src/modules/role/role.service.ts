@@ -91,7 +91,7 @@ export class RoleService {
     current, pageSize, order,
     id = '', name = '', description = '', createdBy = '',
     createdTime, updatedTime,
-  }: SearchRoleParams): Promise<PageRes<RoleEntity>> {
+  }: SearchRoleParams, relations: (keyof RoleEntity)[] = ['createdBy']): Promise<PageRes<RoleEntity>> {
     return this.roleRepo.findAndCount({
       where: deleteUndefinedProperties({
         id: !id ? undefined : Like(`%${id}%`),
@@ -104,7 +104,7 @@ export class RoleService {
       skip: (current - 1) * pageSize,
       take: pageSize,
       order: deleteUndefinedProperties(order),
-      relations: ['createdBy'],
+      relations,
     }).then(([entities, total]) => {
       return genePageRes(entities, {
         data: entities,

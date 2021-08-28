@@ -13,7 +13,7 @@ export class RoleController {
   @Post('search')
   async search(@Body(SearchRoleQueryPipe) query: SearchRoleParams) {
     const datas = await this.service.search(query)
-    return formatPages(datas, this.service.buildRO)
+    return formatPages(datas, this.service.buildRO.bind(this.service))
   }
 
   @Roles('admin')

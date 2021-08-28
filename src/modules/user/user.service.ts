@@ -10,7 +10,7 @@ import { CryptoUtil } from 'src/utils/crypto.util'
 import { CreateUser } from './dto/create-user.dto'
 import { UpdateUserInfoDto } from './dto/update-user-info.dto'
 import { SignindDto } from './dto/signin.dto'
-import { ADMIN_ID, ADMIN_PHONE, CREATE_ADMIN_BY_EMAIL_OBJ, UserOnlineState } from 'src/constants'
+import { ADMIN_ID, ADMIN_PHONE, CodeType, CREATE_ADMIN_BY_EMAIL_OBJ, UserOnlineState } from 'src/constants'
 import { AuthCodeService } from '../auth-code/auth-code.service'
 import { limitPageQuery } from 'src/shared/pipes/page-query.pipe'
 import { genePageRes, PageQuery, PageRes } from 'src/utils/page'
@@ -49,7 +49,7 @@ export const defaultUserRO: UserRO = {
 
 export type SearchUserParams = PageQuery<
   UserEntity,
-  'id' | 'nickname' | 'phone' | 'email' | 'onlineState' | 'createdTime' | 'updatedTime' | 'roles'
+  'id' | 'nickname' | 'phone' | 'email' | 'onlineState' | 'createdTime' | 'updatedTime'
 > & {
   id?: string;
   nickname?: string;
@@ -62,7 +62,7 @@ export type SearchUserParams = PageQuery<
 }
 
 export const SearchUserQueryPipe = limitPageQuery<UserEntity>({
-  orderKeys: ['id', 'nickname', 'phone', 'email', 'onlineState', 'createdTime', 'updatedTime', 'roles'],
+  orderKeys: ['id', 'nickname', 'phone', 'email', 'onlineState', 'createdTime', 'updatedTime'],
 })
 
 @Injectable()
@@ -133,7 +133,7 @@ export class UserService {
     current, pageSize, order,
     id = '', nickname = '', phone = '', email = '', onlineState,
     createdTime, updatedTime, roles,
-  }: SearchUserParams): Promise<PageRes<UserEntity>> {
+  }: SearchUserParams, relations: (keyof UserEntity)[] = ['roles']): Promise<PageRes<UserEntity>> {
     return this.userRepo.findAndCount({
       where: deleteUndefinedProperties({
         id: !id ? undefined : Like(`%${id}%`),
@@ -158,7 +158,7 @@ export class UserService {
       skip: (current - 1) * pageSize,
       take: pageSize,
       order: deleteUndefinedProperties(order),
-      relations: ['roles'],
+      relations,
     }).then(([entities, total]) => {
       return genePageRes(entities, {
         data: entities,
@@ -198,7 +198,7 @@ export class UserService {
         if (!await this.authCodeService.checkAuthCode({
           account,
           code,
-          codeType: 'signin',
+          codeType: CodeType.signin,
         })) {
           throw new BadRequestException('账号或验证码有误: 验证码有误')
         }
@@ -258,7 +258,7 @@ export class UserService {
     if (!ignoreAuth && !await this.authCodeService.checkAuthCode({
       account,
       code: authCode,
-      codeType: 'signin',
+      codeType: CodeType.signin,
     })) {
       throw new BadRequestException('验证码有误')
     }
