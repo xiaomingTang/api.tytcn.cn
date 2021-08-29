@@ -3,7 +3,7 @@ import {
 } from '@nestjs/common'
 import { IsPublic, Roles } from 'src/decorators/guard.decorator'
 import { formatPages } from 'src/utils/page'
-import { CreateUser } from './dto/create-user.dto'
+import { CreateUserDto } from './dto/create-user.dto'
 import { SignindDto } from './dto/signin.dto'
 import { UpdateUserInfoDto } from './dto/update-user-info.dto'
 import {
@@ -22,7 +22,7 @@ export class UserController {
 
   @Roles('admin')
   @Post('new')
-  async create(@Body() dto: CreateUser) {
+  async create(@Body() dto: CreateUserDto) {
     const data = await this.service.create(dto)
     return this.service.buildRO(data)
   }

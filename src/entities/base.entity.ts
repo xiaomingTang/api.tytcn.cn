@@ -15,8 +15,8 @@ class BaseEntity {
    */
   @BeforeInsert()
   private async geneId() {
-    const randValue = randomInt(10 ** 16, 10 ** 17, true)
-    this.id = (this._prefix ?? '') + randValue.toString(36) + (this._suffix ?? '')
+    const randString = randomInt(10 ** 16, 10 ** 17, true).toString(36)
+    this.id = (this._prefix ?? '') + randString + (this._suffix ?? '')
   }
  
   @BeforeUpdate()
@@ -46,6 +46,6 @@ export class BaseEntityWithPublicId extends BaseEntity {
 }
 
 export class BaseEntityWithPrivateId extends BaseEntity {
-  @Column({ default: () => `${Date.now().toString(36)}-` })
+  @Column({ default: `${Date.now().toString(36)}-` })
   _prefix: string
 }

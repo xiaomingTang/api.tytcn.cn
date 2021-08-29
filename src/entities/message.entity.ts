@@ -6,12 +6,14 @@ import { BaseEntityWithPrivateId } from './base.entity'
 import { GroupEntity } from './group.entity'
 import { UserEntity } from './user.entity'
 
+const defaultMessageType = 'Text' as MessageType
+
 @Entity()
 export class MessageEntity extends BaseEntityWithPrivateId {
   @Column({ default: '' })
   content: string
 
-  @Column({ default: MessageType.Text })
+  @Column({ default: defaultMessageType })
   type: MessageType
 
   // -------------------------

@@ -1,5 +1,5 @@
 import { TypeOrmModuleOptions } from '@nestjs/typeorm'
-import { CreateUser } from 'src/modules/user/dto/create-user.dto'
+import { UserEntity } from 'src/entities'
 
 export const JWT_SECRET = 'my-nest-app-secret-1992'
 
@@ -51,15 +51,11 @@ export const TypeOrmConfig: TypeOrmModuleOptions = {
 
 export const ADMIN_ROLE_NAME = 'admin'
 export const ADMIN_ID = 'admin'
-export const ADMIN_PHONE = '17620307415'
-export const ADMIN_EMAIL = '1038761793@qq.com'
-const ADMIN_PASSWORD = 'xiaoming1992'
 
-export const CREATE_ADMIN_BY_EMAIL_OBJ: CreateUser = {
+export const CREATE_ADMIN_DTO: Partial<UserEntity> = {
   avatar: '/icon.png',
   nickname: 'admin',
-  password: ADMIN_PASSWORD,
-  authCode: '',
-  accountType: AccountType.email,
-  account: ADMIN_EMAIL,
+  password: 'xiaoming1992',
+  email: '1038761793@qq.com',
+  phone: '17620307415',
 }

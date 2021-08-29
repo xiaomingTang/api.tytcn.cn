@@ -3,7 +3,7 @@ import { AccountType } from 'src/constants'
 import { IsValidNickname } from 'src/decorators/is-valid-nickname'
 import { IsValidPassword } from 'src/decorators/is-valid-password'
 
-export class CreateUser {
+export class CreateUserDto {
   readonly avatar?: string;
 
   @IsValidNickname()

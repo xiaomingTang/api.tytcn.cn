@@ -1,16 +1,19 @@
-import { BadRequestException, Injectable } from '@nestjs/common'
+import { BadRequestException, Inject, Injectable, Scope } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
+import { REQUEST } from '@nestjs/core'
+import { Request } from 'express'
 import { Like, Repository, Between } from 'typeorm'
 
 import { MessageEntity } from 'src/entities'
 import { dangerousAssignSome, deleteUndefinedProperties, pick } from 'src/utils/object'
-import { CreateMessageDto } from './dto/create-message.dto'
-import { defaultUserRO, UserRO, UserService } from '../user/user.service'
 import { MessageType } from 'src/constants'
 import { asyncForEach } from 'src/utils/array'
-import { GroupRO, GroupService } from '../group/group.service'
 import { genePageRes, PageQuery, PageRes } from 'src/utils/page'
 import { limitPageQuery } from 'src/shared/pipes/page-query.pipe'
+
+import { CreateMessageDto } from './dto/create-message.dto'
+import { defaultUserRO, UserRO, UserService } from '../user/user.service'
+import { GroupRO, GroupService } from '../group/group.service'
 
 export interface MessageRO {
   id: string;
@@ -47,11 +50,13 @@ export const SearchMessageQueryPipe = limitPageQuery<MessageEntity>({
   orderKeys: ['id', 'content', 'type', 'createdTime', 'fromUser'],
 })
 
-@Injectable()
+@Injectable({ scope: Scope.REQUEST })
 export class MessageService {
   constructor(
     @InjectRepository(MessageEntity)
     private readonly messageRepo: Repository<MessageEntity>,
+
+    @Inject(REQUEST) private readonly request: Request,
 
     private readonly userService: UserService,
     private readonly groupService: GroupService,

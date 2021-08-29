@@ -1,7 +1,9 @@
 import {
-  Body, Controller, Post,
+  Body, Controller, Post, UseGuards,
 } from '@nestjs/common'
+import { Throttle } from '@nestjs/throttler'
 import { IsPublic } from 'src/decorators/guard.decorator'
+import { FriendlyThrottlerGuard } from 'src/guards/friendly-throttle.guard'
 import { AuthCodeService } from './auth-code.service'
 import { CreateAuthCodeDto } from './dto/create-auth-code.dto'
 
@@ -9,7 +11,8 @@ import { CreateAuthCodeDto } from './dto/create-auth-code.dto'
 export class AuthCodeController {
   constructor(private readonly service: AuthCodeService) {}
 
-  // @TODO: 调用频率需要额外限制
+  @UseGuards(FriendlyThrottlerGuard)
+  @Throttle(2, 60)
   @IsPublic()
   @Post('new')
   async createAuthCode(@Body() dto: CreateAuthCodeDto) {

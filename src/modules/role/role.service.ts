@@ -52,12 +52,14 @@ export class RoleService {
   }
 
   private async initAdminRole() {
-    try {
-      if (!await this.getByName(ADMIN_ROLE_NAME)) {
-        throw new Error('no admin role')
-      }
-    } catch (err) {
-      await this.create({
+    const role = await this.roleRepo.findOne({
+      where: {
+        name: ADMIN_ROLE_NAME,
+      },
+    })
+    if (!role) {
+      await this.roleRepo.save({
+        ...new RoleEntity(),
         name: ADMIN_ROLE_NAME,
         description: '管理员',
       })

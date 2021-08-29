@@ -1,16 +1,23 @@
 import { Injectable } from '@nestjs/common'
+import { InjectRepository } from '@nestjs/typeorm'
 import { UserEntity } from 'src/entities'
-import { UserService } from 'src/modules/user/user.service'
+import { Repository } from 'typeorm'
 
 @Injectable()
 export class AuthService {
   constructor(
-    private readonly usersService: UserService,
+    @InjectRepository(UserEntity)
+    private readonly userRepo: Repository<UserEntity>,
   ) {}
 
   async validateUser(id: string): Promise<UserEntity> {
-    // relations 必须带上 roles, 因为 roles 在 roles.guard.ts 中使用到了
-    const data = await this.usersService.getById(id)
-    return data
+    const user = await this.userRepo.findOne({
+      where: {
+        id,
+      },
+      // relations 必须带上 roles, 因为 roles 在 roles.guard.ts 中使用到了
+      relations: ['roles'],
+    })
+    return user
   }
 }

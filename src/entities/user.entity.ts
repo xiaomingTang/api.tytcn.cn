@@ -10,6 +10,8 @@ import { MessageEntity } from './message.entity'
 import { RoleEntity } from './role.entity'
 import { BaseEntityWithPublicId } from './base.entity'
 
+const defaultOnlineState = 'On' as UserOnlineState
+
 @Entity()
 export class UserEntity extends BaseEntityWithPublicId {
   @BeforeInsert()
@@ -17,36 +19,24 @@ export class UserEntity extends BaseEntityWithPublicId {
     this.password = createHash('sha256').update(this.password).digest('hex')
   }
 
-  @Column({
-    default: '',
-  })
+  @Column({ default: '' })
   nickname: string
 
-  @Column({
-    default: '',
-  })
+  @Column({ default: '' })
   @IsEmail()
   email: string
 
-  @Column({
-    default: '',
-  })
+  @Column({ default: '' })
   @IsMobilePhone('zh-CN')
   phone: string
 
-  @Column({
-    default: '',
-  })
+  @Column({ default: '' })
   password: string
 
-  @Column({
-    default: '',
-  })
+  @Column({ default: '' })
   avatar: string
 
-  @Column({
-    default: UserOnlineState.On,
-  })
+  @Column({ default: defaultOnlineState })
   onlineState: UserOnlineState
 
   // -------------------------

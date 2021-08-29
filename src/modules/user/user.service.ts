@@ -1,4 +1,4 @@
-import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common'
+import { BadRequestException, Inject, Injectable, NotFoundException, Scope } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { JwtService } from '@nestjs/jwt'
 import { Between, Like, Repository } from 'typeorm'
@@ -7,13 +7,15 @@ import { isEmail, isMobilePhone } from 'class-validator'
 import { UserEntity } from 'src/entities'
 import { dangerousAssignSome, deleteUndefinedProperties, pick } from 'src/utils/object'
 import { CryptoUtil } from 'src/utils/crypto.util'
-import { CreateUser } from './dto/create-user.dto'
+import { CreateUserDto } from './dto/create-user.dto'
 import { UpdateUserInfoDto } from './dto/update-user-info.dto'
 import { SignindDto } from './dto/signin.dto'
-import { ADMIN_ID, ADMIN_PHONE, CodeType, CREATE_ADMIN_BY_EMAIL_OBJ, UserOnlineState } from 'src/constants'
+import { ADMIN_ID, CodeType, CREATE_ADMIN_DTO, UserOnlineState } from 'src/constants'
 import { AuthCodeService } from '../auth-code/auth-code.service'
 import { limitPageQuery } from 'src/shared/pipes/page-query.pipe'
 import { genePageRes, PageQuery, PageRes } from 'src/utils/page'
+import { REQUEST } from '@nestjs/core'
+import { Request } from 'express'
 
 export interface UserRO {
   id: string;
@@ -65,11 +67,13 @@ export const SearchUserQueryPipe = limitPageQuery<UserEntity>({
   orderKeys: ['id', 'nickname', 'phone', 'email', 'onlineState', 'createdTime', 'updatedTime'],
 })
 
-@Injectable()
+@Injectable({ scope: Scope.REQUEST })
 export class UserService {
   constructor(
     @InjectRepository(UserEntity)
     private readonly userRepo: Repository<UserEntity>,
+
+    @Inject(REQUEST) private readonly request: Request,
 
     @Inject(CryptoUtil)
     private readonly cryptoUtil: CryptoUtil,
@@ -82,17 +86,18 @@ export class UserService {
   }
 
   async initAdminUser() {
-    try {
-      if (!await this.getById(ADMIN_ID)) {
-        throw new Error('no admin user')
-      }
-    } catch(err) {
-      const { id: adminId } = await this.create(CREATE_ADMIN_BY_EMAIL_OBJ, true)
+    const user = await this.userRepo.findOne({
+      where: {
+        id: ADMIN_ID,
+      },
+    })
+    if (!user) {
+      const newUser = dangerousAssignSome(new UserEntity(), CREATE_ADMIN_DTO, 'avatar', 'nickname', 'password', 'email', 'phone')
+      const savedUser = await this.userRepo.save(newUser)
       await this.userRepo.update({
-        id: adminId,
+        id: savedUser.id,
       }, {
         id: ADMIN_ID,
-        phone: ADMIN_PHONE,
       })
     }
   }
@@ -242,7 +247,7 @@ export class UserService {
   async create({
     accountType, account, authCode,
     ...dto
-  }: CreateUser, ignoreAuth = false): Promise<UserEntity> {
+  }: CreateUserDto, ignoreAuth = false): Promise<UserEntity> {
     const curUser = dangerousAssignSome(new UserEntity(), dto, 'avatar', 'nickname', 'password')
     switch (accountType) {
       case 'email':

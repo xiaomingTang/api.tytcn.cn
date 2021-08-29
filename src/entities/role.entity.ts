@@ -4,7 +4,7 @@ import { UserEntity } from './user.entity'
 
 @Entity()
 export class RoleEntity extends BaseEntityWithPrivateId {
-  @Column({ unique: true, default: '' })
+  @Column({ unique: true, nullable: false })
   name: string
 
   @Column({ default: '暂无描述' })
