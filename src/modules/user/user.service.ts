@@ -141,6 +141,10 @@ export class UserService {
     return user
   }
 
+  getMyself(): UserEntity {
+    return this.request.user as UserEntity
+  }
+
   /**
    * string 空值为 undefined 或 空字符串
    * array 空值为 undefined 或 []

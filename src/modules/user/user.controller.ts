@@ -45,6 +45,11 @@ export class UserController {
     return this.service.buildRO(data)
   }
 
+  @Get('myself')
+  async getMyself() {
+    return this.service.buildRO(this.service.getMyself())
+  }
+
   @IsPublic()
   @Get(':id')
   async getById(@Param('id') id: string) {
