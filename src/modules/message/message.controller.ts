@@ -9,7 +9,7 @@ import { MessageService, SearchMessageParams, SearchMessageQueryPipe } from './m
 export class MessageController {
   constructor(private readonly service: MessageService) {}
 
-  @Get('search')
+  @Post('search')
   async search(@Body(SearchMessageQueryPipe) query: SearchMessageParams) {
     const datas = await this.service.search(query)
     return formatPages(datas, this.service.buildRO.bind(this.service))

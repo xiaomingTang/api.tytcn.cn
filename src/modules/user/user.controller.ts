@@ -27,7 +27,7 @@ export class UserController {
     return this.service.buildRO(data)
   }
 
-  @Get('search')
+  @Post('search')
   async search(@Body(SearchUserQueryPipe) query: SearchUserParams) {
     const datas = await this.service.search(query)
     return formatPages(datas, this.service.buildRO.bind(this.service))

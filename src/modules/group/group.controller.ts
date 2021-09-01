@@ -10,7 +10,7 @@ import { GroupService, SearchGroupParams, SearchGroupQueryPipe } from './group.s
 export class GroupController {
   constructor(private readonly service: GroupService) {}
 
-  @Get('search')
+  @Post('search')
   async search(@Body(SearchGroupQueryPipe) query: SearchGroupParams) {
     const datas = await this.service.search(query)
     return formatPages(datas, this.service.buildRO.bind(this.service))
