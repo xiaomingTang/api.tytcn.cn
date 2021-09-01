@@ -1,5 +1,5 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common'
-import { APP_GUARD } from '@nestjs/core'
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core'
 import { ThrottlerModule } from '@nestjs/throttler'
 
 import { LoggerMiddleware } from './middlewares/logger.middleware'
@@ -13,9 +13,15 @@ import { JwtAuthGuard } from './guards/auth.guard'
 import { AuthCodeModule } from './modules/auth-code/auth-code.module'
 import { RoleModule } from './modules/role/role.module'
 import { FriendlyThrottlerGuard } from './guards/friendly-throttle.guard'
+import { UpdateUserAccessTimeInterceptor } from './interceptors/transform-response.interceptor'
+import { UserEntity } from './entities'
+import { TypeOrmModule } from '@nestjs/typeorm'
 
 @Module({
   imports: [
+    TypeOrmModule.forFeature([
+      UserEntity,
+    ]),
     ThrottlerModule.forRoot({
       ttl: 60,
       limit: 10,
@@ -36,6 +42,10 @@ import { FriendlyThrottlerGuard } from './guards/friendly-throttle.guard'
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: UpdateUserAccessTimeInterceptor,
     },
   ],
 })

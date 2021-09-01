@@ -1,14 +1,15 @@
-import { BadRequestException, Injectable } from '@nestjs/common'
+import { BadRequestException, Inject, Injectable, Scope } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Between, Like, Repository } from 'typeorm'
 
-import { RoleEntity } from 'src/entities'
+import { RoleEntity, UserEntity } from 'src/entities'
 import { dangerousAssignSome, deleteUndefinedProperties, pick } from 'src/utils/object'
 import { CreateRoleDto } from './dto/create-role.dto'
-import { defaultUserRO, UserRO, UserService } from '../user/user.service'
+import { defaultUserRO, RequestWithUser, UserRO, UserService } from '../user/user.service'
 import { genePageRes, PageQuery, PageRes } from 'src/utils/page'
 import { limitPageQuery } from 'src/shared/pipes/page-query.pipe'
 import { ADMIN_ROLE_NAME } from 'src/constants'
+import { REQUEST } from '@nestjs/core'
 
 export interface RoleRO {
   id: string;
@@ -40,11 +41,13 @@ export const SearchRoleQueryPipe = limitPageQuery<RoleEntity>({
   orderKeys: ['id', 'name', 'description', 'createdBy', 'createdTime', 'updatedTime'],
 })
 
-@Injectable()
+@Injectable({ scope: Scope.REQUEST })
 export class RoleService {
   constructor(
     @InjectRepository(RoleEntity)
     private readonly roleRepo: Repository<RoleEntity>,
+
+    @Inject(REQUEST) private readonly request: RequestWithUser,
 
     private readonly userService: UserService,
   ) {
@@ -128,15 +131,17 @@ export class RoleService {
   async create(dto: CreateRoleDto): Promise<RoleEntity> {
     const newAuthCode = dangerousAssignSome(new RoleEntity(), dto, 'name', 'description')
 
-    
-    try {
-      newAuthCode.createdBy = await this.userService.getById('admin')
+    newAuthCode.createdBy = this.request.user as UserEntity
+    if (!newAuthCode.createdBy) {
+      throw new BadRequestException('创建者不存在')
+    }
 
+    try {
       const savedRole = await this.roleRepo.save(newAuthCode)
 
       return savedRole
     } catch (error) {
-      throw new BadRequestException(`验证码发送失败 ${error.message}`)
+      throw new BadRequestException(`验证码发送失败: ${error.message}`)
     }
   }
 

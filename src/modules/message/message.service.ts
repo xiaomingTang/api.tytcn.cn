@@ -4,7 +4,7 @@ import { REQUEST } from '@nestjs/core'
 import { Request } from 'express'
 import { Like, Repository, Between } from 'typeorm'
 
-import { MessageEntity } from 'src/entities'
+import { MessageEntity, UserEntity } from 'src/entities'
 import { dangerousAssignSome, deleteUndefinedProperties, pick } from 'src/utils/object'
 import { MessageType } from 'src/constants'
 import { asyncForEach } from 'src/utils/array'
@@ -112,7 +112,9 @@ export class MessageService {
   async create(dto: CreateMessageDto): Promise<MessageEntity> {
     const newMessage = dangerousAssignSome(new MessageEntity(), dto, 'content', 'type')
 
-    newMessage.fromUser = await this.userService.getById(dto.fromUserId, ['postedMessages'])
+    newMessage.fromUser = this.request.user as UserEntity
+    newMessage.toUsers = []
+    newMessage.toGroups = []
 
     const MAX_COUNT = 10
     if (dto.toUserIds.length > MAX_COUNT || dto.toGroupIds.length > MAX_COUNT) {
@@ -120,13 +122,15 @@ export class MessageService {
     }
     await asyncForEach(dto.toUserIds, async (id) => {
       const targetUser = await this.userService.getById(id)
-      newMessage.toUsers = newMessage.toUsers ?? []
-      newMessage.toUsers.push(targetUser)
+      if (targetUser) {
+        newMessage.toUsers.push(targetUser)
+      }
     })
     await asyncForEach(dto.toGroupIds, async (id) => {
       const targetGroup = await this.groupService.getById(id)
-      newMessage.toGroups = newMessage.toGroups ?? []
-      newMessage.toGroups.push(targetGroup)
+      if (targetGroup) {
+        newMessage.toGroups.push(targetGroup)
+      }
     })
 
     try {

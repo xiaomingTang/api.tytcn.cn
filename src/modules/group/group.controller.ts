@@ -1,6 +1,9 @@
 import {
-  Body, Controller, Delete, Get, Param, Post, Put,
+  Body, Controller, Delete, Get, Param, Post, Put, Req,
 } from '@nestjs/common'
+import { Request } from 'express'
+import { ADMIN_ID } from 'src/constants'
+import { onlySomeAccessible } from 'src/utils/auth'
 import { formatPages } from 'src/utils/page'
 import { CreateGroupDto } from './dto/create-group.dto'
 import { UpdateGroupInfoDto } from './dto/update-group-info.dto'
@@ -17,10 +20,23 @@ export class GroupController {
   }
 
   @Post('new')
-  async createUser(@Body() dto: CreateGroupDto) {
+  async createGroup(
+    @Body() dto: CreateGroupDto,
+    @Req() req: Request,
+  ) {
+    onlySomeAccessible(req, ADMIN_ID, dto.ownerId)
     return this.service.create(dto)
   }
 
+  /**
+   * 当前热门用户
+   */
+  @Get('hot')
+  async getHotGroups() {
+    const datas = await this.service.getHotGroups()
+    return formatPages(datas, this.service.buildRO.bind(this.service))
+  }
+  
   @Get(':id')
   async getById(@Param('id') id: string) {
     const data = await this.service.getById(id)
@@ -28,12 +44,23 @@ export class GroupController {
   }
 
   @Put(':id')
-  async updateUserInfo(@Param('id') id: string, @Body() dto: UpdateGroupInfoDto) {
+  async updateUserInfo(
+    @Param('id') id: string,
+    @Body() dto: UpdateGroupInfoDto,
+    @Req() req: Request
+  ) {
+    const group = await this.service.getById(id, ['owner'])
+    onlySomeAccessible(req, ADMIN_ID, group.owner?.id)
     return this.service.updateInfo(id, dto)
   }
 
   @Delete(':id')
-  async delete(@Param('id') id: string) {
+  async delete(
+    @Param('id') id: string,
+    @Req() req: Request
+  ) {
+    const group = await this.service.getById(id, ['owner'])
+    onlySomeAccessible(req, ADMIN_ID, group.owner?.id)
     return this.service.delete(id)
   }
 }

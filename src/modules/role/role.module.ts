@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common'
 import { TypeOrmModule } from '@nestjs/typeorm'
 
-import { AuthCodeEntity, RoleEntity, UserEntity } from 'src/entities'
+import { AuthCodeEntity, NicknameEntity, RoleEntity, UserEntity } from 'src/entities'
 import { AuthCodeService } from '../auth-code/auth-code.service'
 import { UserService } from '../user/user.service'
 
@@ -11,7 +11,7 @@ import { RoleService } from './role.service'
 @Module({
   imports: [
     TypeOrmModule.forFeature([
-      RoleEntity, UserEntity, AuthCodeEntity,
+      RoleEntity, UserEntity, AuthCodeEntity, NicknameEntity,
     ]),
   ],
   providers: [RoleService, UserService, AuthCodeService],

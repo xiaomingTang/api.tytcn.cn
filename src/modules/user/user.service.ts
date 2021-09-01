@@ -4,18 +4,23 @@ import { JwtService } from '@nestjs/jwt'
 import { Between, Like, Repository } from 'typeorm'
 import { isEmail, isMobilePhone } from 'class-validator'
 
-import { UserEntity } from 'src/entities'
-import { dangerousAssignSome, deleteUndefinedProperties, pick } from 'src/utils/object'
+import { UserEntity, NicknameEntity } from 'src/entities'
+import { dangerousAssignSome, deleteUndefinedProperties, geneNewEntity, pick } from 'src/utils/object'
 import { CryptoUtil } from 'src/utils/crypto.util'
 import { CreateUserDto } from './dto/create-user.dto'
 import { UpdateUserInfoDto } from './dto/update-user-info.dto'
 import { SignindDto } from './dto/signin.dto'
-import { ADMIN_ID, CodeType, CREATE_ADMIN_DTO, UserOnlineState } from 'src/constants'
+import { ADMIN_ID, CodeType, CREATE_ADMIN_DTO } from 'src/constants'
 import { AuthCodeService } from '../auth-code/auth-code.service'
 import { limitPageQuery } from 'src/shared/pipes/page-query.pipe'
 import { genePageRes, PageQuery, PageRes } from 'src/utils/page'
 import { REQUEST } from '@nestjs/core'
 import { Request } from 'express'
+import { getRandomAvatar, getRandomNickname } from './utils'
+
+export interface RequestWithUser extends Request {
+  user?: UserEntity;
+}
 
 export interface UserRO {
   id: string;
@@ -24,7 +29,6 @@ export interface UserRO {
   token: string;
   phone: string;
   email: string;
-  onlineState: UserOnlineState;
   friends: UserRO[];
   roles: string[];
   groups: string[];
@@ -40,7 +44,6 @@ export const defaultUserRO: UserRO = {
   token: '',
   phone: '',
   email: '',
-  onlineState: UserOnlineState.Off,
   friends: [],
   roles: [],
   groups: [],
@@ -51,32 +54,30 @@ export const defaultUserRO: UserRO = {
 
 export type SearchUserParams = PageQuery<
   UserEntity,
-  'id' | 'nickname' | 'phone' | 'email' | 'onlineState' | 'createdTime' | 'updatedTime'
+  'id' | 'nickname' | 'phone' | 'email' | 'createdTime' | 'updatedTime' | 'lastAccessTime'
 > & {
   id?: string;
   nickname?: string;
   phone?: string;
   email?: string;
-  onlineState?: UserOnlineState;
   createdTime?: [number, number];
   updatedTime?: [number, number];
   roles?: string[];
 }
 
 export const SearchUserQueryPipe = limitPageQuery<UserEntity>({
-  orderKeys: ['id', 'nickname', 'phone', 'email', 'onlineState', 'createdTime', 'updatedTime'],
+  orderKeys: ['id', 'nickname', 'phone', 'email', 'createdTime', 'updatedTime'],
 })
 
 @Injectable({ scope: Scope.REQUEST })
 export class UserService {
   constructor(
-    @InjectRepository(UserEntity)
-    private readonly userRepo: Repository<UserEntity>,
+    @InjectRepository(UserEntity) private readonly userRepo: Repository<UserEntity>,
+    @InjectRepository(NicknameEntity) private readonly nicknameRepo: Repository<NicknameEntity>,
 
-    @Inject(REQUEST) private readonly request: Request,
+    @Inject(REQUEST) private readonly request: RequestWithUser,
 
-    @Inject(CryptoUtil)
-    private readonly cryptoUtil: CryptoUtil,
+    @Inject(CryptoUtil) private readonly cryptoUtil: CryptoUtil,
 
     private readonly authCodeService: AuthCodeService,
 
@@ -85,7 +86,11 @@ export class UserService {
     this.initAdminUser()
   }
 
-  async initAdminUser() {
+  /**
+   * 仅用于 constructor 时创建 admin 用户
+   * 设为 private, 外部不得调用
+   */
+  private async initAdminUser() {
     const user = await this.userRepo.findOne({
       where: {
         id: ADMIN_ID,
@@ -96,9 +101,9 @@ export class UserService {
       const savedUser = await this.userRepo.save(newUser)
       await this.userRepo.update({
         id: savedUser.id,
-      }, {
+      }, geneNewEntity(UserEntity, {
         id: ADMIN_ID,
-      })
+      }))
     }
   }
 
@@ -109,9 +114,6 @@ export class UserService {
       },
       relations,
     })
-    if (!user) {
-      throw new BadRequestException('用户不存在')
-    }
     return user
   }
 
@@ -122,9 +124,6 @@ export class UserService {
       },
       relations,
     })
-    if (!user) {
-      throw new BadRequestException('用户不存在')
-    }
     return user
   }
 
@@ -135,14 +134,40 @@ export class UserService {
       },
       relations,
     })
-    if (!user) {
-      throw new BadRequestException('用户不存在')
-    }
     return user
   }
 
+  async getHotUsers(): Promise<PageRes<UserEntity>> {
+    // const selfId = this.request.user?.id ?? ''
+    const now = new Date()
+    // @TODO: 开发阶段暂时先用 100min, 以后需要慢慢改为 10min 或 5min
+    // (100min)有效期之前
+    const timeBefore = new Date(now.getTime() - 1000 * 60 * 100)
+    // +1s, 防止遗漏此时更新的 user
+    const timeAfter = new Date(now.getTime() + 1000)
+    return this.userRepo.findAndCount({
+      where: {
+        // @TODO: 开发阶段暂时先不排除 selfId, 正式阶段再考虑是否需要过滤自身
+        // id: Not(selfId),
+        lastAccessTime: Between(timeBefore, timeAfter),
+      },
+      order: {
+        lastAccessTime: 'DESC',
+      },
+      // 取前 10 位
+      take: 10,
+    }).then(([entities, total]) => {
+      return genePageRes(entities, {
+        data: entities,
+        current: 1,
+        pageSize: 10,
+        total,
+      })
+    })
+  }
+
   getMyself(): UserEntity {
-    return this.request.user as UserEntity
+    return this.request.user
   }
 
   /**
@@ -152,7 +177,7 @@ export class UserService {
    */
   async search({
     current, pageSize, order,
-    id = '', nickname = '', phone = '', email = '', onlineState,
+    id = '', nickname = '', phone = '', email = '',
     createdTime, updatedTime, roles,
   }: SearchUserParams, relations: (keyof UserEntity)[] = ['roles']): Promise<PageRes<UserEntity>> {
     return this.userRepo.findAndCount({
@@ -163,7 +188,6 @@ export class UserService {
         email: !email ? undefined : Like(`%${email}%`),
         createdTime: !createdTime ? undefined : Between(...createdTime),
         updatedTime: !updatedTime ? undefined : Between(...updatedTime),
-        onlineState: !onlineState ? undefined : onlineState,
         // roles: !(roles && roles.length > 0) ? undefined : Raw((alias) => `${'role.name'} @> ARRAY[:...roles]`, { roles }),
         // @TODO: 需要增加 roles 查询
         // roles: !(roles && roles.length > 0) ? undefined : {
@@ -252,7 +276,14 @@ export class UserService {
     accountType, account, authCode,
     ...dto
   }: CreateUserDto, ignoreAuth = false): Promise<UserEntity> {
-    const curUser = dangerousAssignSome(new UserEntity(), dto, 'avatar', 'nickname', 'password')
+    const  nickname = dto.nickname || await getRandomNickname(this.nicknameRepo)
+    const avatar = dto.avatar || getRandomAvatar()
+
+    const curUser = dangerousAssignSome(new UserEntity(), {
+      ...dto,
+      nickname,
+      avatar,
+    }, 'avatar', 'nickname', 'password')
     switch (accountType) {
       case 'email':
         if (!isEmail(account)) {
@@ -290,7 +321,7 @@ export class UserService {
   async updateInfo(id: string, dto: UpdateUserInfoDto): Promise<boolean> {
     await this.userRepo.update({
       id,
-    }, pick(dto, ['avatar', 'nickname']))
+    }, geneNewEntity(UserEntity, pick(dto, ['avatar', 'nickname'])))
 
     return true
   }

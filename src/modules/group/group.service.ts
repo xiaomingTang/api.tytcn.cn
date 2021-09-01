@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm'
 import { Between, Like, Repository } from 'typeorm'
 
 import { GroupEntity, UserEntity } from 'src/entities'
-import { dangerousAssignSome, deleteUndefinedProperties, pick } from 'src/utils/object'
+import { dangerousAssignSome, deleteUndefinedProperties, geneNewEntity, pick } from 'src/utils/object'
 import { CreateGroupDto } from './dto/create-group.dto'
 import { UpdateGroupInfoDto } from './dto/update-group-info.dto'
 import { defaultUserRO, UserRO, UserService } from '../user/user.service'
@@ -63,6 +63,31 @@ export class GroupService {
     return group
   }
 
+  async getHotGroups(): Promise<PageRes<GroupEntity>> {
+    const now = new Date()
+    // 一段时间内 (10min) 被更新过
+    const timeBefore = new Date(now.getTime() - 1000 * 60 * 10)
+    // +1s, 防止遗漏此时更新的 user
+    const timeAfter = new Date(now.getTime() + 1000)
+    return this.groupRepo.findAndCount({
+      where: {
+        updatedTime: Between(timeBefore, timeAfter),
+      },
+      order: {
+        updatedTime: 'DESC',
+      },
+      // 取前 10 位
+      take: 10,
+    }).then(([entities, total]) => {
+      return genePageRes(entities, {
+        data: entities,
+        current: 1,
+        pageSize: 10,
+        total,
+      })
+    })
+  }
+
   /**
    * string 空值为 undefined 或 空字符串
    * array 空值为 undefined 或 []
@@ -98,7 +123,7 @@ export class GroupService {
     newGroup.owner = await this.userService.getById(dto.ownerId, ['ownGroups'])
 
     if (!newGroup.owner) {
-      throw new Error('用户不存在')
+      throw new Error('群创建者不存在')
     }
 
     newGroup.owner.ownGroups.push(newGroup)
@@ -116,7 +141,7 @@ export class GroupService {
   async updateInfo(id: string, dto: UpdateGroupInfoDto): Promise<boolean> {
     await this.groupRepo.update({
       id,
-    }, pick(dto, ['name', 'notice']))
+    }, geneNewEntity(GroupEntity, pick(dto, ['name', 'notice'])))
 
     return true
   }

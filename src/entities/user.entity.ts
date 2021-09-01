@@ -4,13 +4,10 @@ import {
 import { createHash } from 'crypto'
 import { IsEmail, IsMobilePhone } from 'class-validator'
 
-import { UserOnlineState } from 'src/constants'
 import { GroupEntity } from './group.entity'
 import { MessageEntity } from './message.entity'
 import { RoleEntity } from './role.entity'
 import { BaseEntityWithPublicId } from './base.entity'
-
-const defaultOnlineState = 'On' as UserOnlineState
 
 @Entity()
 export class UserEntity extends BaseEntityWithPublicId {
@@ -36,8 +33,8 @@ export class UserEntity extends BaseEntityWithPublicId {
   @Column({ default: '' })
   avatar: string
 
-  @Column({ default: defaultOnlineState })
-  onlineState: UserOnlineState
+  @Column({ default: () => 'CURRENT_TIMESTAMP'})
+  lastAccessTime: Date
 
   // -------------------------
   // 其他复杂关系

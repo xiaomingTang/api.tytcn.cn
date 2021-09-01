@@ -24,11 +24,6 @@ export enum SigninType {
   qrcode = 'qrcode',
 }
 
-export enum UserOnlineState {
-  On = 'On',
-  Off = 'Off',
-}
-
 export enum MessageType {
   Text = 'Text',
   Image = 'Image',

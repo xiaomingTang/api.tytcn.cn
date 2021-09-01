@@ -1,3 +1,5 @@
+import { BaseEntity } from 'typeorm'
+
 type ObjectKey = string | number | symbol
 
 /**
@@ -38,6 +40,14 @@ export function deleteUndefinedProperties<T extends Record<ObjectKey, any>>(obj:
     if (obj[key] === undefined) {
       delete obj[key]
     }
+  })
+  return obj
+}
+
+export function geneNewEntity<Entity = BaseEntity>(prototype: new () => Entity, record: Partial<Entity>): Entity {
+  const obj = new prototype()
+  Object.entries(record).forEach(([key, value]) => {
+    obj[key] = value
   })
   return obj
 }

@@ -12,7 +12,8 @@ export class AuthCodeController {
   constructor(private readonly service: AuthCodeService) {}
 
   @UseGuards(FriendlyThrottlerGuard)
-  @Throttle(2, 60)
+  // @TODO: 开发阶段先用 20, 正式环境应该设置为 2
+  @Throttle(20, 60)
   @IsPublic()
   @Post('new')
   async createAuthCode(@Body() dto: CreateAuthCodeDto) {

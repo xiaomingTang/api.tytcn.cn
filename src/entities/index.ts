@@ -1,5 +1,6 @@
 export * from './group.entity'
 export * from './message.entity'
+export * from './nickname.entity'
 export * from './role.entity'
 export * from './user.entity'
 export * from './auth-code.entity'

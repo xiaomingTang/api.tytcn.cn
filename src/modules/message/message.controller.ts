@@ -1,5 +1,5 @@
 import {
-  Body, Controller, Delete, Get, Param, Post,
+  Body, Controller, Get, Param, Post,
 } from '@nestjs/common'
 import { formatPages } from 'src/utils/page'
 import { CreateMessageDto } from './dto/create-message.dto'
@@ -24,10 +24,5 @@ export class MessageController {
   async getById(@Param('id') id: string) {
     const data = await this.service.getById(id, ['fromUser', 'toUsers', 'toGroups'])
     return this.service.buildRO(data)
-  }
-
-  @Delete(':id')
-  async delete(@Param('id') id: string) {
-    return this.service.delete(id)
   }
 }
