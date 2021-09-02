@@ -3,7 +3,7 @@ import {
 } from '@nestjs/common'
 import { formatPages } from 'src/utils/page'
 import { CreateMessageDto } from './dto/create-message.dto'
-import { MessageService, SearchMessageParams, SearchMessageQueryPipe } from './message.service'
+import { GetMessageListParams, GetMessageListQueryPipe, MessageService, SearchMessageParams, SearchMessageQueryPipe } from './message.service'
 
 @Controller('/api/message')
 export class MessageController {
@@ -15,6 +15,12 @@ export class MessageController {
     return formatPages(datas, this.service.buildRO.bind(this.service))
   }
 
+  @Post('list-between')
+  async getMessageList(@Body(GetMessageListQueryPipe) query: GetMessageListParams) {
+    const datas = await this.service.getMessageList(query)
+    return formatPages(datas, this.service.buildRO.bind(this.service))
+  }
+
   @Post('new')
   async createUser(@Body() dto: CreateMessageDto) {
     return this.service.create(dto)
@@ -22,7 +28,7 @@ export class MessageController {
 
   @Get(':id')
   async getById(@Param('id') id: string) {
-    const data = await this.service.getById(id, ['fromUser', 'toUsers', 'toGroups'])
+    const data = await this.service.getById(id, ['fromUser', 'toUser', 'toGroup'])
     return this.service.buildRO(data)
   }
 }

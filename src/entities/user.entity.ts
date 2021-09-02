@@ -78,7 +78,7 @@ export class UserEntity extends BaseEntityWithPublicId {
   /**
    * 已接收消息
    */
-  @ManyToMany(() => MessageEntity, (m) => m.toUsers)
+  @OneToMany(() => MessageEntity, (m) => m.toUser)
   @JoinTable()
   receivedMessages?: MessageEntity[]
 }

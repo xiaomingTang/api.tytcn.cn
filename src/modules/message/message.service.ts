@@ -1,8 +1,8 @@
-import { BadRequestException, Inject, Injectable, Scope } from '@nestjs/common'
+import { BadRequestException, ForbiddenException, Inject, Injectable, Scope, UnauthorizedException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { REQUEST } from '@nestjs/core'
 import { Request } from 'express'
-import { Like, Repository, Between } from 'typeorm'
+import { Like, Repository, Between, In, Any } from 'typeorm'
 
 import { MessageEntity, UserEntity } from 'src/entities'
 import { dangerousAssignSome, deleteUndefinedProperties, pick } from 'src/utils/object'
@@ -13,15 +13,16 @@ import { limitPageQuery } from 'src/shared/pipes/page-query.pipe'
 
 import { CreateMessageDto } from './dto/create-message.dto'
 import { defaultUserRO, UserRO, UserService } from '../user/user.service'
-import { GroupRO, GroupService } from '../group/group.service'
+import { defaultGroupRO, GroupRO, GroupService } from '../group/group.service'
+import { isAdmin } from 'src/utils/auth'
 
 export interface MessageRO {
   id: string;
   content: string;
   type: MessageType;
   fromUser: UserRO;
-  toUsers: UserRO[];
-  toGroups: GroupRO[];
+  toUser: UserRO;
+  toGroup: GroupRO;
 }
 
 export const defaultMessageRO: MessageRO = {
@@ -29,8 +30,8 @@ export const defaultMessageRO: MessageRO = {
   content: '',
   type: MessageType.Text,
   fromUser: defaultUserRO,
-  toUsers: [],
-  toGroups: [],
+  toUser: defaultUserRO,
+  toGroup: defaultGroupRO,
 }
 
 export type SearchMessageParams = PageQuery<
@@ -50,6 +51,19 @@ export const SearchMessageQueryPipe = limitPageQuery<MessageEntity>({
   orderKeys: ['id', 'content', 'type', 'createdTime', 'fromUser'],
 })
 
+export type GetMessageListParams = PageQuery<
+  MessageEntity,
+  'type' | 'createdTime'
+> & {
+  masterId: string;
+  targetType?: 'user' | 'group';
+  targetId?: string;
+}
+
+export const GetMessageListQueryPipe = limitPageQuery<MessageEntity>({
+  orderKeys: ['type', 'createdTime'],
+})
+
 @Injectable({ scope: Scope.REQUEST })
 export class MessageService {
   constructor(
@@ -61,6 +75,14 @@ export class MessageService {
     private readonly userService: UserService,
     private readonly groupService: GroupService,
   ) {}
+
+  get requestUser() {
+    return this.request.user as UserEntity | undefined
+  }
+
+  get selfId() {
+    return this.requestUser?.id ?? ''
+  }
 
   async getById(id: string, relations: (keyof MessageEntity)[] = []) {
     const message = await this.messageRepo.findOne({
@@ -85,16 +107,43 @@ export class MessageService {
     id = '', content = '', type,
     createdTime, fromUserId, toUserId, toGroupId,
   }: SearchMessageParams, relations: (keyof MessageEntity)[] = ['fromUser']): Promise<PageRes<MessageEntity>> {
+    if (!this.selfId) {
+      throw new UnauthorizedException()
+    }
+    if (!isAdmin(this.request)) {
+      if (fromUserId !== this.selfId) {
+        if (toUserId && toUserId !== this.selfId) {
+          throw new ForbiddenException('你无权查看他人信息')
+        }
+        if (toGroupId && !await this.userService.isInGroup({ userId: this.selfId, groupId: toGroupId })) {
+          throw new ForbiddenException('你不是群成员, 无法查看群消息')
+        }
+      }
+    }
     return this.messageRepo.findAndCount({
       where: deleteUndefinedProperties({
-        id: !id ? undefined : Like(`%${id}%`),
+        id: !id ? undefined : id,
         content: !content ? undefined : Like(`%${content}%`),
-        createdTime: !createdTime ? undefined : Between(...createdTime),
         type: !type ? undefined : type,
-        // @TODO: 需要增加 fromUserId, toUserId, toGroupId 查询
-        // 其中当请求者是 admin 时, fromUser 有效
-        // 当请求者不是 admin 时, fromUser 为请求者的 id
+        createdTime: !createdTime ? undefined : Between(...createdTime),
+        fromUser: !fromUserId ? undefined : {
+          id: fromUserId,
+        },
+        toUser: !toUserId ? undefined : {
+          id: toUserId,
+        },
+        toGroup: !toGroupId ? undefined : {
+          id: toGroupId,
+        },
       }),
+      join: {
+        alias: 'user',
+        leftJoin: {
+          fromUser: 'user.fromUser',
+          toUser: 'user.toUser',
+          toGroup: 'user.toGroup',
+        },
+      },
       skip: (current - 1) * pageSize,
       take: pageSize,
       order: deleteUndefinedProperties(order),
@@ -109,31 +158,124 @@ export class MessageService {
     })
   }
 
+  /**
+   * @param masterId 我们希望查询的用户id
+   * @param targetType 该用户发生交流的其他用户或群组
+   * @param targetId 用户或群组id
+   */
+  async getMessageList({
+    current, pageSize, order,
+    masterId, targetId, targetType,
+  }: GetMessageListParams) {
+    if (!isAdmin(this.request) && masterId !== this.selfId) {
+      throw new ForbiddenException()
+    }
+    const restParams = {
+      skip: (current - 1) * pageSize,
+      take: pageSize,
+      order: deleteUndefinedProperties(order),
+      join: {
+        alias: 'user',
+        leftJoin: {
+          fromUser: 'user.fromUser',
+          toUser: 'user.toUser',
+          toGroup: 'user.toGroup',
+        },
+      }
+    }
+    if (!targetId) {
+      return this.messageRepo.findAndCount({
+        where: [
+          {
+            fromUser: {
+              id: masterId,
+            },
+          },
+          {
+            toUser: {
+              id: masterId,
+            },
+          },
+          {
+            toGroup: In(this.requestUser?.groups || []),
+          },
+        ],
+        ...restParams,
+      }).then(([entities, total]) => {
+        return genePageRes(entities, {
+          data: entities,
+          current,
+          pageSize,
+          total,
+        })
+      })
+    }
+    if (targetType === 'user') {
+      return this.messageRepo.findAndCount({
+        where: [
+          {
+            fromUser: {
+              id: masterId,
+            },
+            toUser: {
+              id: targetId,
+            }
+          },
+          {
+            fromUser: {
+              id: targetId,
+            },
+            toUser: {
+              id: masterId,
+            }
+          },
+        ],
+        ...restParams,
+      }).then(([entities, total]) => {
+        return genePageRes(entities, {
+          data: entities,
+          current,
+          pageSize,
+          total,
+        })
+      })
+    }
+    if (targetType === 'group') {
+      return this.messageRepo.findAndCount({
+        where: {
+          fromUser: {
+            id: masterId,
+          },
+          toGroup: {
+            id: targetId,
+          }
+        },
+        ...restParams,
+      }).then(([entities, total]) => {
+        return genePageRes(entities, {
+          data: entities,
+          current,
+          pageSize,
+          total,
+        })
+      })
+    }
+  }
+
   async create(dto: CreateMessageDto): Promise<MessageEntity> {
     const newMessage = dangerousAssignSome(new MessageEntity(), dto, 'content', 'type')
 
-    newMessage.fromUser = this.request.user as UserEntity
-    newMessage.toUsers = []
-    newMessage.toGroups = []
-
-    const MAX_COUNT = 10
-    if (dto.toUserIds.length > MAX_COUNT || dto.toGroupIds.length > MAX_COUNT) {
-      throw new BadRequestException(`群发用户数或群组数不能超过 ${MAX_COUNT}`)
-    }
-    await asyncForEach(dto.toUserIds, async (id) => {
-      const targetUser = await this.userService.getById(id)
-      if (targetUser) {
-        newMessage.toUsers.push(targetUser)
-      }
-    })
-    await asyncForEach(dto.toGroupIds, async (id) => {
-      const targetGroup = await this.groupService.getById(id)
-      if (targetGroup) {
-        newMessage.toGroups.push(targetGroup)
-      }
-    })
+    newMessage.fromUser = this.requestUser
 
     try {
+      if (dto.toUserId) {
+        newMessage.toUser = await this.userService.getById(dto.toUserId)
+      } else if (dto.toGroupId) {
+        newMessage.toGroup = await this.groupService.getById(dto.toGroupId)
+      } else {
+        throw new BadRequestException('没有收信人')
+      }
+
       return this.messageRepo.save(newMessage)
     } catch (error) {
       throw new BadRequestException(`消息发送失败: ${error.message}`)
@@ -164,8 +306,8 @@ export class MessageService {
       ...defaultMessageRO,
       ...pick(message, ['id', 'content', 'type']),
       fromUser: message.fromUser ? this.userService.exportAsItem(message.fromUser) : defaultUserRO,
-      toUsers: (message.toUsers ?? []).map((item) => this.userService.exportAsItem(item)),
-      toGroups: (message.toGroups ?? []).map((item) => this.groupService.exportAsItem(item)),
+      toUser: message.toUser ? this.userService.exportAsItem(message.toUser) : defaultUserRO,
+      toGroup: message.toGroup ? this.groupService.exportAsItem(message.toGroup) : defaultGroupRO,
     }
   }
 }

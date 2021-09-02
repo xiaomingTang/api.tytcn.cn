@@ -31,18 +31,16 @@ export class MessageEntity extends BaseEntityWithPrivateId {
   /**
    * 消息接收者(用户)
    */
-  @JoinTable()
-  @ManyToMany(() => UserEntity, (u) => u.receivedMessages, {
+  @ManyToOne(() => UserEntity, (u) => u.receivedMessages, {
     cascade: true,
   })
-  toUsers?: UserEntity[]
+  toUser?: UserEntity
 
   /**
    * 消息接收者(群组)
    */
-  @JoinTable()
-  @ManyToMany(() => GroupEntity, (g) => g.messages, {
+  @ManyToOne(() => GroupEntity, (g) => g.messages, {
     cascade: true,
   })
-  toGroups?: GroupEntity[]
+  toGroup?: GroupEntity
 }

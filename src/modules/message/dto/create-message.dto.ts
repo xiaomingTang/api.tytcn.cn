@@ -16,7 +16,7 @@ export class CreateMessageDto {
   })
   readonly fromUserId: string;
 
-  readonly toUserIds: string[];
+  readonly toUserId?: string;
 
-  readonly toGroupIds: string[];
+  readonly toGroupId?: string;
 }

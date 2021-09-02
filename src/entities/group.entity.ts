@@ -32,6 +32,6 @@ export class GroupEntity extends BaseEntityWithPublicId {
   /**
    * 已接收消息
    */
-  @ManyToMany(() => MessageEntity, (m) => m.toGroups)
+  @ManyToMany(() => MessageEntity, (m) => m.toGroup)
   messages?: MessageEntity[]
 }

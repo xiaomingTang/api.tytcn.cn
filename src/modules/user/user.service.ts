@@ -179,8 +179,21 @@ export class UserService {
     })
   }
 
-  getMyself(): UserEntity {
+  getMyself(): UserEntity | undefined {
     return this.request.user
+  }
+
+  async isInGroup({ userId, groupId }: {
+    userId: string;
+    groupId: string;
+  }) {
+    const user = await this.getById(userId, ['groups'])
+    return !!user.groups.find((item) => item.id === groupId)
+  }
+
+  async isFriends(userIdA: string, userIdB: string) {
+    const user = await this.getById(userIdA, ['friends'])
+    return !!user.friends.find((item) => item.id === userIdB)
   }
 
   /**

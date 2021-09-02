@@ -60,7 +60,12 @@ export class UserController {
    */
   @Get('myself')
   async getMyself() {
-    return this.service.buildRO(this.service.getMyself())
+    const myself = this.service.getMyself()
+    if (!myself) {
+      // 由于该接口经过 AuthGuard, 所以正常情况不会执行到这
+      throw new BadRequestException('用户不存在')
+    }
+    return this.service.buildRO(myself)
   }
 
   /**
