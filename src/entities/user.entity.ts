@@ -19,11 +19,11 @@ export class UserEntity extends BaseEntityWithPublicId {
   @Column({ default: '' })
   nickname: string
 
-  @Column({ default: '' })
+  @Column({ unique: true, nullable: true })
   @IsEmail()
   email: string
 
-  @Column({ default: '' })
+  @Column({ unique: true, nullable: true })
   @IsMobilePhone('zh-CN')
   phone: string
 

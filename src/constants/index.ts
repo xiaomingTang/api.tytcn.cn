@@ -1,5 +1,6 @@
 import { TypeOrmModuleOptions } from '@nestjs/typeorm'
 import { UserEntity } from 'src/entities'
+import { getRandomAvatar } from 'src/modules/user/utils'
 
 export const JWT_SECRET = 'my-nest-app-secret-1992'
 
@@ -48,8 +49,8 @@ export const ADMIN_ROLE_NAME = 'admin'
 export const ADMIN_ID = 'admin'
 
 export const CREATE_ADMIN_DTO: Partial<UserEntity> = {
-  avatar: '/icon.png',
-  nickname: 'admin',
+  avatar: getRandomAvatar(6),
+  nickname: '王小明',
   password: 'xiaoming1992',
   email: '1038761793@qq.com',
   phone: '17620307415',

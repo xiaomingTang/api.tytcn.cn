@@ -35,6 +35,9 @@ export async function getRandomNickname(repo: Repository<NicknameEntity>) {
   return nickname
 }
 
-export function getRandomAvatar() {
-  return `/static/images/avatar-minified/${randomInt(1, 30).toString().padStart(3, '0')}.jpg`
+/**
+ * @param n n ∈ [1, 30]
+ */
+export function getRandomAvatar(n?: number) {
+  return `/static/images/avatar-minified/${(n || randomInt(1, 30)).toString().padStart(3, '0')}.jpg`
 }

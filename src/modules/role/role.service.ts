@@ -5,10 +5,9 @@ import { Between, Like, Repository } from 'typeorm'
 import { RoleEntity, UserEntity } from 'src/entities'
 import { dangerousAssignSome, deleteUndefinedProperties, pick } from 'src/utils/object'
 import { CreateRoleDto } from './dto/create-role.dto'
-import { defaultUserRO, RequestWithUser, UserRO, UserService } from '../user/user.service'
+import { defaultUserRO, RequestWithUser, UserRO } from '../user/user.service'
 import { genePageRes, PageQuery, PageRes } from 'src/utils/page'
 import { limitPageQuery } from 'src/shared/pipes/page-query.pipe'
-import { ADMIN_ROLE_NAME } from 'src/constants'
 import { REQUEST } from '@nestjs/core'
 
 export interface RoleRO {
@@ -48,26 +47,7 @@ export class RoleService {
     private readonly roleRepo: Repository<RoleEntity>,
 
     @Inject(REQUEST) private readonly request: RequestWithUser,
-
-    private readonly userService: UserService,
-  ) {
-    this.initAdminRole()
-  }
-
-  private async initAdminRole() {
-    const role = await this.roleRepo.findOne({
-      where: {
-        name: ADMIN_ROLE_NAME,
-      },
-    })
-    if (!role) {
-      await this.roleRepo.save({
-        ...new RoleEntity(),
-        name: ADMIN_ROLE_NAME,
-        description: '管理员',
-      })
-    }
-  }
+  ) {}
 
   async getById(id: string, relations: (keyof RoleEntity)[] = []) {
     const role = await this.roleRepo.findOne({
@@ -159,7 +139,6 @@ export class RoleService {
     return {
       ...defaultAuthCodeRO,
       ...pick(role, ['id', 'name', 'description']),
-      createdBy: this.userService.exportAsItem(role.createdBy),
     }
   }
 }

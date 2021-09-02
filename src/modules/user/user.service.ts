@@ -4,13 +4,13 @@ import { JwtService } from '@nestjs/jwt'
 import { Between, Like, Repository } from 'typeorm'
 import { isEmail, isMobilePhone } from 'class-validator'
 
-import { UserEntity, NicknameEntity } from 'src/entities'
+import { UserEntity, NicknameEntity, RoleEntity } from 'src/entities'
 import { dangerousAssignSome, deleteUndefinedProperties, geneNewEntity, pick } from 'src/utils/object'
 import { CryptoUtil } from 'src/utils/crypto.util'
 import { CreateUserDto } from './dto/create-user.dto'
 import { UpdateUserInfoDto } from './dto/update-user-info.dto'
 import { SignindDto } from './dto/signin.dto'
-import { ADMIN_ID, CodeType, CREATE_ADMIN_DTO } from 'src/constants'
+import { ADMIN_ID, ADMIN_ROLE_NAME, CodeType, CREATE_ADMIN_DTO } from 'src/constants'
 import { AuthCodeService } from '../auth-code/auth-code.service'
 import { limitPageQuery } from 'src/shared/pipes/page-query.pipe'
 import { genePageRes, PageQuery, PageRes } from 'src/utils/page'
@@ -80,7 +80,6 @@ export class UserService {
     @Inject(CryptoUtil) private readonly cryptoUtil: CryptoUtil,
 
     private readonly authCodeService: AuthCodeService,
-
     private readonly jwtService: JwtService,
   ) {
     this.initAdminUser()
@@ -97,13 +96,27 @@ export class UserService {
       },
     })
     if (!user) {
-      const newUser = dangerousAssignSome(new UserEntity(), CREATE_ADMIN_DTO, 'avatar', 'nickname', 'password', 'email', 'phone')
-      const savedUser = await this.userRepo.save(newUser)
-      await this.userRepo.update({
-        id: savedUser.id,
-      }, geneNewEntity(UserEntity, {
-        id: ADMIN_ID,
-      }))
+      const adminRole = new RoleEntity()
+      const newUser = dangerousAssignSome(new UserEntity(), {
+        ...CREATE_ADMIN_DTO,
+        roles: [
+          adminRole,
+        ],
+      }, 'avatar', 'nickname', 'password', 'email', 'phone', 'roles')
+      adminRole.name = ADMIN_ROLE_NAME
+      adminRole.description = '管理员'
+      adminRole.createdBy = newUser
+
+      try {
+        const savedUser = await this.userRepo.save(newUser)
+        await this.userRepo.update({
+          id: savedUser.id,
+        }, geneNewEntity(UserEntity, {
+          id: ADMIN_ID,
+        }))
+      } catch (error) {
+        // pass
+      }
     }
   }
 

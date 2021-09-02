@@ -30,7 +30,7 @@ class BaseEntity {
   @Column({ default: '' })
   _suffix: string
 
-  @Column({ unique: true })
+  @Column({ default: '' })
   id: string
 
   @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
