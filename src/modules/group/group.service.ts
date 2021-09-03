@@ -8,19 +8,19 @@ import { CreateGroupDto } from './dto/create-group.dto'
 import { UpdateGroupInfoDto } from './dto/update-group-info.dto'
 import { defaultUserRO, UserRO, UserService } from '../user/user.service'
 import { limitPageQuery } from 'src/shared/pipes/page-query.pipe'
-import { genePageRes, PageQuery, PageRes } from 'src/utils/page'
+import { genePageResPipe, PageQuery, PageRes } from 'src/utils/page'
 
 export interface GroupRO {
   id: string;
   name: string;
-  notice: string;
+  description: string;
   owner: UserRO;
 }
 
 export const defaultGroupRO: GroupRO = {
   id: '',
   name: '',
-  notice: '',
+  description: '',
   owner: defaultUserRO,
 }
 
@@ -67,7 +67,7 @@ export class GroupService {
     const now = new Date()
     // 一段时间内 (10min) 被更新过
     const timeBefore = new Date(now.getTime() - 1000 * 60 * 10)
-    // +1s, 防止遗漏此时更新的 user
+    // +1s, 防止遗漏此时更新的 group
     const timeAfter = new Date(now.getTime() + 1000)
     return this.groupRepo.findAndCount({
       where: {
@@ -78,14 +78,7 @@ export class GroupService {
       },
       // 取前 10 位
       take: 10,
-    }).then(([entities, total]) => {
-      return genePageRes(entities, {
-        data: entities,
-        current: 1,
-        pageSize: 10,
-        total,
-      })
-    })
+    }).then(genePageResPipe({ current: 1, pageSize: 10 }))
   }
 
   /**
@@ -102,31 +95,30 @@ export class GroupService {
         id: !id ? undefined : Like(`%${id}%`),
         name: !name ? undefined : Like(`%${name}%`),
         createdTime: !createdTime ? undefined : Between(...createdTime),
-        // @TODO: 新增搜索 ownerId
+        owner: !ownerId ? undefined : {
+          id: ownerId,
+        },
       }),
+      join: {
+        alias: 'group',
+        leftJoinAndSelect: {
+          owner: 'group.owner',
+        },
+      },
       skip: (current - 1) * pageSize,
       take: pageSize,
       order: deleteUndefinedProperties(order),
       relations,
-    }).then(([entities, total]) => {
-      return genePageRes(entities, {
-        data: entities,
-        current,
-        pageSize,
-        total,
-      })
-    })
+    }).then(genePageResPipe({ current, pageSize }))
   }
 
   async create(dto: CreateGroupDto): Promise<string> {
-    const newGroup = dangerousAssignSome(new GroupEntity(), dto, 'name', 'notice')
-    newGroup.owner = await this.userService.getById(dto.ownerId, ['ownGroups'])
+    const newGroup = dangerousAssignSome(new GroupEntity(), dto, 'name', 'description')
+    newGroup.owner = await this.userService.getById(dto.ownerId)
 
     if (!newGroup.owner) {
       throw new Error('群创建者不存在')
     }
-
-    newGroup.owner.ownGroups.push(newGroup)
 
     try {
       const savedGroup = await this.groupRepo.save(newGroup)
@@ -141,7 +133,7 @@ export class GroupService {
   async updateInfo(id: string, dto: UpdateGroupInfoDto): Promise<boolean> {
     await this.groupRepo.update({
       id,
-    }, geneNewEntity(GroupEntity, pick(dto, ['name', 'notice'])))
+    }, geneNewEntity(GroupEntity, pick(dto, ['name', 'description'])))
 
     return true
   }
@@ -160,7 +152,7 @@ export class GroupService {
   exportAsItem(group: GroupEntity): GroupRO {
     return {
       ...defaultGroupRO,
-      ...pick(group, ['id', 'name', 'notice']),
+      ...pick(group, ['id', 'name', 'description']),
       owner: group.owner ? this.userService.exportAsItem(group.owner) : defaultUserRO,
     }
   }
@@ -168,7 +160,7 @@ export class GroupService {
   buildRO(group: GroupEntity): GroupRO {
     return {
       ...defaultGroupRO,
-      ...pick(group, ['id', 'name', 'notice']),
+      ...pick(group, ['id', 'name', 'description']),
       owner: group.owner ? this.userService.exportAsItem(group.owner) : defaultUserRO,
     }
   }

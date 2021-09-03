@@ -43,7 +43,7 @@ export class AuthCodeService {
     const now = new Date()
     // (60s)有效期之前
     const timeBefore = new Date(now.getTime() - 1000 * 60)
-    const authCode = (await this.authCodeRepo.findOne({
+    const codeEntity = (await this.authCodeRepo.findOne({
       where: {
         account,
         accountType: isEmail(account) ? 'email' : 'phone',
@@ -55,11 +55,7 @@ export class AuthCodeService {
       },
     }))
 
-    if (authCode && authCode.code === code) {
-      return true
-    }
-
-    return false
+    return codeEntity && codeEntity.code === code
   }
 
   async create(dto: CreateAuthCodeDto): Promise<string> {
@@ -69,9 +65,9 @@ export class AuthCodeService {
     newAuthCode.code = `${Math.floor(Math.random() * 8999) + 1000}`
 
     try {
-      const savedAuthCode = await this.authCodeRepo.save(newAuthCode)
+      const savedCodeEntity = await this.authCodeRepo.save(newAuthCode)
 
-      return savedAuthCode.code
+      return savedCodeEntity.code
     } catch (error) {
       throw new BadRequestException(`验证码发送失败 ${error.message}`)
     }

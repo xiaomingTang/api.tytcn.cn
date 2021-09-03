@@ -16,7 +16,8 @@ export class AuthService {
         id,
       },
       // relations 必须带上 roles, 因为 roles 在 roles.guard.ts 中使用到了
-      relations: ['roles', 'groups', 'ownGroups'],
+      // relations 必须带上 groups, 因为 groups 在 很多地方使用到了
+      relations: ['roles', 'groups'],
     })
     return user
   }

@@ -7,9 +7,6 @@ export class RoleEntity extends BaseEntityWithPrivateId {
   @Column({ unique: true, nullable: false })
   name: string
 
-  @Column({ default: '暂无描述' })
-  description: string
-
   @OneToOne(() => UserEntity)
   createdBy: UserEntity;
 

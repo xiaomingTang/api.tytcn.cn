@@ -3,6 +3,7 @@ import {
 } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 import { ROLES_KEY } from 'src/constants'
+import { UserEntity } from 'src/entities'
 
 @Injectable()
 export class RolesGuard implements CanActivate {
@@ -17,7 +18,7 @@ export class RolesGuard implements CanActivate {
 
     // 在请求对象中获取 user 对象，此 user 对象是 AuthStrategy 中 validate 方法成功执行后的返回值
     const request = context.switchToHttp().getRequest()
-    const { user } = request
+    const user = request.user as UserEntity || undefined
 
     // 判断当前请求用户的角色是否可以访问
     return user && !!user.roles.find((item) => roles.includes(item.name))

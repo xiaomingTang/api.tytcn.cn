@@ -10,9 +10,6 @@ export class GroupEntity extends BaseEntityWithPublicId {
   @Column({ unique: true, nullable: false })
   name: string
 
-  @Column({ default: '群主很懒，什么都没写' })
-  notice: string
-
   // -------------------------
   // 其他复杂关系
   // -------------------------

@@ -7,6 +7,7 @@ import {
 } from 'src/entities'
 import { NicknameEntity } from 'src/entities'
 import { AuthCodeService } from '../auth-code/auth-code.service'
+import { RoleService } from '../role/role.service'
 
 import { UserController } from './user.controller'
 import { UserService } from './user.service'

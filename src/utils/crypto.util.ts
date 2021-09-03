@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { createHash } from 'crypto'
 
 @Injectable()
@@ -19,13 +19,6 @@ export class CryptoUtil {
    * @param encryptedPassword 加密后的密码
    */
   checkPassword(password: string, encryptedPassword: string): boolean {
-    if (!password) {
-      return false
-    }
-    const currentPass = this.encryptPassword(password)
-    if (currentPass === encryptedPassword) {
-      return true
-    }
-    return false
+    return password && this.encryptPassword(password) === encryptedPassword
   }
 }

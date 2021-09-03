@@ -1,5 +1,5 @@
 import { TypeOrmModuleOptions } from '@nestjs/typeorm'
-import { UserEntity } from 'src/entities'
+import { RoleEntity, UserEntity } from 'src/entities'
 import { getRandomAvatar } from 'src/modules/user/utils'
 
 export const JWT_SECRET = 'my-nest-app-secret-1992'
@@ -10,11 +10,18 @@ export const IS_PUBLIC_KEY = 'is-public'
 
 export const ROLES_KEY = 'roles'
 
+/**
+ * 账号类型
+ */
 export enum AccountType {
   phone = 'phone',
   email = 'email',
 }
 
+/**
+ * 验证码类型(作用)
+ * signin: 用于登录
+ */
 export enum CodeType {
   signin = 'signin',
 }
@@ -45,8 +52,19 @@ export const TypeOrmConfig: TypeOrmModuleOptions = {
   // entities: ["dist/entities/*.entity{.ts,.js}"],
 }
 
+/**
+ * 管理员 角色 name
+ */
 export const ADMIN_ROLE_NAME = 'admin'
+/**
+ * 管理员 id
+ */
 export const ADMIN_ID = 'admin'
+
+export const CREATE_ADMIN_ROLE_DTO: Partial<RoleEntity> = {
+  name: ADMIN_ROLE_NAME,
+  description: '管理员',
+}
 
 export const CREATE_ADMIN_DTO: Partial<UserEntity> = {
   avatar: getRandomAvatar(6),

@@ -1,7 +1,7 @@
-import { BadRequestException, Inject, Injectable, NotFoundException, Scope } from '@nestjs/common'
+import { BadRequestException, Inject, Injectable, Scope } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { JwtService } from '@nestjs/jwt'
-import { Between, Like, Repository } from 'typeorm'
+import { Between, Like, Raw, Repository } from 'typeorm'
 import { isEmail, isMobilePhone } from 'class-validator'
 
 import { UserEntity, NicknameEntity, RoleEntity } from 'src/entities'
@@ -13,7 +13,7 @@ import { SignindDto } from './dto/signin.dto'
 import { ADMIN_ID, ADMIN_ROLE_NAME, CodeType, CREATE_ADMIN_DTO } from 'src/constants'
 import { AuthCodeService } from '../auth-code/auth-code.service'
 import { limitPageQuery } from 'src/shared/pipes/page-query.pipe'
-import { genePageRes, PageQuery, PageRes } from 'src/utils/page'
+import { genePageResPipe, PageQuery, PageRes } from 'src/utils/page'
 import { REQUEST } from '@nestjs/core'
 import { Request } from 'express'
 import { getRandomAvatar, getRandomNickname } from './utils'
@@ -26,35 +26,31 @@ export interface UserRO {
   id: string;
   nickname: string;
   avatar: string;
+  description: string;
   token: string;
   phone: string;
   email: string;
   friends: UserRO[];
   roles: string[];
   groups: string[];
-  ownGroups: string[];
-  postedMessages: string[];
-  receivedMessages: string[];
 }
 
 export const defaultUserRO: UserRO = {
   id: '',
   nickname: '',
   avatar: '',
+  description: '',
   token: '',
   phone: '',
   email: '',
   friends: [],
   roles: [],
   groups: [],
-  ownGroups: [],
-  postedMessages: [],
-  receivedMessages: [],
 }
 
 export type SearchUserParams = PageQuery<
   UserEntity,
-  'id' | 'nickname' | 'phone' | 'email' | 'createdTime' | 'updatedTime' | 'lastAccessTime'
+  'id' | 'nickname' | 'phone' | 'email' | 'createdTime' | 'updatedTime'
 > & {
   id?: string;
   nickname?: string;
@@ -162,25 +158,14 @@ export class UserService {
       where: {
         // @TODO: 开发阶段暂时先不排除 selfId, 正式阶段再考虑是否需要过滤自身
         // id: Not(selfId),
-        lastAccessTime: Between(timeBefore, timeAfter),
+        updatedTime: Between(timeBefore, timeAfter),
       },
       order: {
-        lastAccessTime: 'DESC',
+        updatedTime: 'DESC',
       },
       // 取前 10 位
       take: 10,
-    }).then(([entities, total]) => {
-      return genePageRes(entities, {
-        data: entities,
-        current: 1,
-        pageSize: 10,
-        total,
-      })
-    })
-  }
-
-  getMyself(): UserEntity | undefined {
-    return this.request.user
+    }).then(genePageResPipe({ current: 1, pageSize: 10 }))
   }
 
   async isInGroup({ userId, groupId }: {
@@ -188,12 +173,12 @@ export class UserService {
     groupId: string;
   }) {
     const user = await this.getById(userId, ['groups'])
-    return !!user.groups.find((item) => item.id === groupId)
+    return !!user?.groups.find((item) => item.id === groupId)
   }
 
   async isFriends(userIdA: string, userIdB: string) {
     const user = await this.getById(userIdA, ['friends'])
-    return !!user.friends.find((item) => item.id === userIdB)
+    return !!user?.friends.find((item) => item.id === userIdB)
   }
 
   /**
@@ -214,30 +199,23 @@ export class UserService {
         email: !email ? undefined : Like(`%${email}%`),
         createdTime: !createdTime ? undefined : Between(...createdTime),
         updatedTime: !updatedTime ? undefined : Between(...updatedTime),
-        // roles: !(roles && roles.length > 0) ? undefined : Raw((alias) => `${'role.name'} @> ARRAY[:...roles]`, { roles }),
+        roles: !(roles && roles.length > 0) ? undefined : Raw((alias) => `${alias} @> ARRAY[:...roles]`, { roles }),
         // @TODO: 需要增加 roles 查询
         // roles: !(roles && roles.length > 0) ? undefined : {
         //   name: In(roles),
         // },
       }),
-      // join: {
-      //   alias: 'role',
-      //   innerJoinAndSelect: {
-      //     'user': 'user',
-      //   }
-      // },
+      join: {
+        alias: 'user',
+        innerJoin: {
+          'roles': 'user.roles',
+        }
+      },
       skip: (current - 1) * pageSize,
       take: pageSize,
       order: deleteUndefinedProperties(order),
       relations,
-    }).then(([entities, total]) => {
-      return genePageRes(entities, {
-        data: entities,
-        current,
-        pageSize,
-        total,
-      })
-    })
+    }).then(genePageResPipe({ current, pageSize }))
   }
 
   /**
@@ -245,12 +223,11 @@ export class UserService {
    */
   async signin({ accountType, account, signinType, code }: SignindDto): Promise<UserRO> {
     let user: UserEntity
-    const relations: (keyof UserEntity)[] = ['roles']
     if (accountType === 'email' && isEmail(account)) {
-      user = await this.getByEmail(account, relations)
+      user = await this.getByEmail(account, ['roles'])
     }
     if (accountType === 'phone' && isMobilePhone(account, 'zh-CN')) {
-      user = await this.getByPhone(account)
+      user = await this.getByPhone(account, ['roles'])
     }
     // 验证码登录
     if (signinType === 'authCode') {
@@ -288,8 +265,7 @@ export class UserService {
     }
 
     if (!user) {
-      // 正常不会执行到这里
-      throw new NotFoundException('用户不存在')
+      throw new BadRequestException('用户不存在')
     }
 
     return {
@@ -301,15 +277,13 @@ export class UserService {
   async create({
     accountType, account, authCode,
     ...dto
-  }: CreateUserDto, ignoreAuth = false): Promise<UserEntity> {
-    const  nickname = dto.nickname || await getRandomNickname(this.nicknameRepo)
-    const avatar = dto.avatar || getRandomAvatar()
+  }: CreateUserDto): Promise<UserEntity> {
+    const curUser = geneNewEntity(UserEntity, {
+      nickname: dto.nickname || await getRandomNickname(this.nicknameRepo),
+      avatar: dto.avatar || getRandomAvatar(),
+      password: dto.password || '',
+    })
 
-    const curUser = dangerousAssignSome(new UserEntity(), {
-      ...dto,
-      nickname,
-      avatar,
-    }, 'avatar', 'nickname', 'password')
     switch (accountType) {
       case 'email':
         if (!isEmail(account)) {
@@ -333,7 +307,7 @@ export class UserService {
         throw new BadRequestException(`unknown accountType: ${accountType}`)
     }
 
-    if (!ignoreAuth && !await this.authCodeService.checkAuthCode({
+    if (!await this.authCodeService.checkAuthCode({
       account,
       code: authCode,
       codeType: CodeType.signin,
@@ -347,7 +321,7 @@ export class UserService {
   async updateInfo(id: string, dto: UpdateUserInfoDto): Promise<boolean> {
     await this.userRepo.update({
       id,
-    }, geneNewEntity(UserEntity, pick(dto, ['avatar', 'nickname'])))
+    }, geneNewEntity(UserEntity, pick(dto, ['avatar', 'nickname', 'description'])))
 
     return true
   }
@@ -366,20 +340,17 @@ export class UserService {
   exportAsItem(user: UserEntity): UserRO {
     return {
       ...defaultUserRO,
-      ...pick(user, ['id', 'nickname', 'phone', 'email', 'avatar']),
+      ...pick(user, ['id', 'nickname', 'phone', 'email', 'avatar', 'description']),
     }
   }
 
   public buildRO(user: UserEntity): UserRO {
     const filteredUser: UserRO = {
       ...defaultUserRO,
-      ...pick(user, ['id', 'nickname', 'phone', 'email', 'avatar']),
+      ...pick(user, ['id', 'nickname', 'phone', 'email', 'avatar', 'description']),
       roles: (user.roles ?? []).map((item) => item.name),
       friends: (user.friends ?? []).map((item) => this.exportAsItem(item)),
       groups: (user.groups ?? []).map((item) => item.name),
-      ownGroups: (user.ownGroups ?? []).map((item) => item.name),
-      postedMessages: (user.postedMessages ?? []).map((item) => item.content),
-      receivedMessages: (user.receivedMessages ?? []).map((item) => item.content),
     }
 
     return filteredUser

@@ -7,7 +7,4 @@ import { BaseEntityWithPublicId } from './base.entity'
 export class NicknameEntity extends BaseEntityWithPublicId {
   @Column({ default: '' })
   name: string
-
-  @Column({ default: () => 'CURRENT_TIMESTAMP'})
-  lastAccessTime: Date
 }

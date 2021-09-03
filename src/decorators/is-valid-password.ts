@@ -4,8 +4,8 @@ import {
 
 @ValidatorConstraint()
 class IsValidPasswordConstraint implements ValidatorConstraintInterface {
-  validate(pass: string) {
-    return !!pass && pass.length >= 6 && pass.length <= 16
+  validate(password: string) {
+    return !!password && password.length >= 6 && password.length <= 16
   }
 
   defaultMessage() {

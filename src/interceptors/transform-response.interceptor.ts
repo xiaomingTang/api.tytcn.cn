@@ -1,5 +1,5 @@
 import {
-  CallHandler, ExecutionContext, Injectable, NestInterceptor, Scope,
+  CallHandler, ExecutionContext, Injectable, NestInterceptor,
 } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Observable } from 'rxjs'
@@ -27,19 +27,21 @@ export class TransformResponseInterceptor<T> implements NestInterceptor<T, Res<T
   }
 }
 
-@Injectable({scope: Scope.REQUEST})
+@Injectable()
 export class UpdateUserAccessTimeInterceptor<T> implements NestInterceptor<T, Res<T>> {
   constructor(
-    @InjectRepository(UserEntity)
-    private readonly userRepo?: Repository<UserEntity>
+    @InjectRepository(UserEntity) private readonly userRepo?: Repository<UserEntity>
   ) {}
   intercept(ctx: ExecutionContext, next: CallHandler): Observable<Res<T>> {
     const id: string = ctx.switchToHttp().getRequest().user?.id
     if (id) {
+      /**
+       * 更新用户访问时间
+       */
       this.userRepo?.update({
         id,
       }, geneNewEntity(UserEntity, {
-        lastAccessTime: new Date(),
+        updatedTime: new Date(),
       }))
     }
     return next.handle()

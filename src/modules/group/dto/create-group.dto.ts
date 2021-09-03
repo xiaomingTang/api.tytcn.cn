@@ -5,7 +5,7 @@ export class CreateGroupDto {
   @IsValidNickname()
   readonly name: string;
 
-  readonly notice?: string;
+  readonly description?: string;
 
   @IsNotEmpty({
     message: '群主id不得为空',

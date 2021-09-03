@@ -11,6 +11,7 @@ import { CreateUserDto } from './dto/create-user.dto'
 import { SignindDto } from './dto/signin.dto'
 import { UpdateUserInfoDto } from './dto/update-user-info.dto'
 import {
+  RequestWithUser,
   SearchUserParams, SearchUserQueryPipe, UserService,
 } from './user.service'
 
@@ -24,7 +25,7 @@ export class UserController {
     return this.service.signin(dto)
   }
 
-  @Roles('admin')
+  @Roles(ADMIN_ID)
   @Post('new')
   async create(@Body() dto: CreateUserDto) {
     const data = await this.service.create(dto)
@@ -59,13 +60,8 @@ export class UserController {
    * 该接口目的是为了在登录页调用, 以确认用户当前登录态是否仍有效
    */
   @Get('myself')
-  async getMyself() {
-    const myself = this.service.getMyself()
-    if (!myself) {
-      // 由于该接口经过 AuthGuard, 所以正常情况不会执行到这
-      throw new BadRequestException('用户不存在')
-    }
-    return this.service.buildRO(myself)
+  async getMyself(@Req() req: RequestWithUser) {
+    return this.service.buildRO(req.user)
   }
 
   /**

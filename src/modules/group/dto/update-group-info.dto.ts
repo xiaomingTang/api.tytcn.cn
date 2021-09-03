@@ -4,5 +4,5 @@ export class UpdateGroupInfoDto {
   @IsValidNickname()
   readonly name: string;
 
-  readonly notice?: string;
+  readonly description?: string;
 }

@@ -5,4 +5,6 @@ export class UpdateUserInfoDto {
   readonly nickname: string;
 
   readonly avatar: string;
+
+  readonly description: string;
 }

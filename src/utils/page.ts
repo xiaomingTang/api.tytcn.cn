@@ -20,6 +20,19 @@ export function genePageRes<T>(datas: T[], pageInfo: Exclude<PageRes<T>, 'data'>
   }
 }
 
+export function genePageResPipe<T>(options?: {
+  current?: number;
+  pageSize?: number;
+}) {
+  const { current = 1, pageSize = 20 } = options || {}
+  return ([entities, total]: [T[], number]) => genePageRes<T>(entities, {
+    data: entities,
+    current,
+    pageSize,
+    total,
+  })
+}
+
 type Formatter<T, S> = (item: T, index: number, array: T[]) => S
 
 export function formatPages<Entity extends BaseEntityWithPublicId, S>(

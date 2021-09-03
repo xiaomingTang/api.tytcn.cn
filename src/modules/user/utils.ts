@@ -9,14 +9,14 @@ export async function getRandomNickname(repo: Repository<NicknameEntity>) {
   try {
     const record = await repo.findOne({
       order: {
-        lastAccessTime: 'ASC',
+        updatedTime: 'ASC',
       }
     })
     if (record) {
       repo.update({
         id: record.id,
       }, geneNewEntity(NicknameEntity, {
-        lastAccessTime: new Date(),
+        updatedTime: new Date(),
       }))
       nickname = record.name
     } else {

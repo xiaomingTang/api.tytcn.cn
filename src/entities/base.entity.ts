@@ -5,9 +5,6 @@ import {
 
 @Entity()
 class BaseEntity {
-  @PrimaryGeneratedColumn()
-  private _id: number
-
   /**
    * 生成 id
    * 可能会重复, 但是概率很低
@@ -30,8 +27,14 @@ class BaseEntity {
   @Column({ default: '' })
   _suffix: string
 
+  @PrimaryGeneratedColumn()
+  private _id: number
+
   @Column({ default: '' })
   id: string
+
+  @Column({ default: '暂无描述' })
+  description: string
 
   @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   createdTime: Date

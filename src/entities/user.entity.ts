@@ -17,6 +17,9 @@ export class UserEntity extends BaseEntityWithPublicId {
   }
 
   @Column({ default: '' })
+  password: string
+
+  @Column({ default: '' })
   nickname: string
 
   @Column({ unique: true, nullable: true })
@@ -28,13 +31,7 @@ export class UserEntity extends BaseEntityWithPublicId {
   phone: string
 
   @Column({ default: '' })
-  password: string
-
-  @Column({ default: '' })
   avatar: string
-
-  @Column({ default: () => 'CURRENT_TIMESTAMP'})
-  lastAccessTime: Date
 
   // -------------------------
   // 其他复杂关系

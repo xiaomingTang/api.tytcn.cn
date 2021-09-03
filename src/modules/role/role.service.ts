@@ -6,9 +6,10 @@ import { RoleEntity, UserEntity } from 'src/entities'
 import { dangerousAssignSome, deleteUndefinedProperties, pick } from 'src/utils/object'
 import { CreateRoleDto } from './dto/create-role.dto'
 import { defaultUserRO, RequestWithUser, UserRO } from '../user/user.service'
-import { genePageRes, PageQuery, PageRes } from 'src/utils/page'
+import { genePageResPipe, PageQuery, PageRes } from 'src/utils/page'
 import { limitPageQuery } from 'src/shared/pipes/page-query.pipe'
 import { REQUEST } from '@nestjs/core'
+import { ADMIN_ROLE_NAME } from 'src/constants'
 
 export interface RoleRO {
   id: string;
@@ -56,9 +57,6 @@ export class RoleService {
       },
       relations,
     })
-    if (!role) {
-      throw new BadRequestException('角色不存在')
-    }
     return role
   }
 
@@ -69,9 +67,6 @@ export class RoleService {
       },
       relations,
     })
-    if (!role) {
-      throw new BadRequestException('角色不存在')
-    }
     return role
   }
 
@@ -92,20 +87,21 @@ export class RoleService {
         description: !description ? undefined : Like(`%${description}%`),
         createdTime: !createdTime ? undefined : Between(...createdTime),
         updatedTime: !updatedTime ? undefined : Between(...updatedTime),
-        // @TODO: 新增 createdBy 搜索
+        createdBy: !createdBy ? undefined : {
+          id: createdBy,
+        },
       }),
+      join: {
+        alias: 'role',
+        leftJoin: {
+          createdBy: 'role.createdBy',
+        },
+      },
       skip: (current - 1) * pageSize,
       take: pageSize,
       order: deleteUndefinedProperties(order),
       relations,
-    }).then(([entities, total]) => {
-      return genePageRes(entities, {
-        data: entities,
-        current,
-        pageSize,
-        total,
-      })
-    })
+    }).then(genePageResPipe({ current, pageSize }))
   }
 
   async create(dto: CreateRoleDto): Promise<RoleEntity> {

@@ -1,6 +1,6 @@
 import { MessageType } from 'src/constants'
 import {
-  Column, Entity, ManyToOne, ManyToMany, JoinTable,
+  Column, Entity, ManyToOne,
 } from 'typeorm'
 import { BaseEntityWithPrivateId } from './base.entity'
 import { GroupEntity } from './group.entity'
