@@ -19,7 +19,7 @@ export class AllExceptionFilter implements ExceptionFilter {
       .json({
         data: null,
         success: false,
-        status: 500,
+        status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: exception.message,
       })
   }

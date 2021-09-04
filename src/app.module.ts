@@ -16,6 +16,10 @@ import { FriendlyThrottlerGuard } from './guards/friendly-throttle.guard'
 import { UpdateUserAccessTimeInterceptor } from './interceptors/transform-response.interceptor'
 import { UserEntity } from './entities'
 import { TypeOrmModule } from '@nestjs/typeorm'
+import { AuthCodeController } from './modules/auth-code/auth-code.controller'
+import { GroupController } from './modules/group/group.controller'
+import { MessageController } from './modules/message/message.controller'
+import { RoleController } from './modules/role/role.controller'
 
 @Module({
   imports: [
@@ -53,6 +57,12 @@ export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
     consumer
       .apply(LoggerMiddleware)
-      .forRoutes(UserController)
+      .forRoutes(
+        AuthCodeController,
+        GroupController,
+        MessageController,
+        RoleController,
+        UserController,
+      )
   }
 }

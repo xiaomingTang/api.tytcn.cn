@@ -3,6 +3,7 @@ import {
 } from '@nestjs/common'
 import { Request } from 'express'
 import { ADMIN_ID } from 'src/constants'
+import { IsPublic } from 'src/decorators/guard.decorator'
 import { onlySomeAccessible } from 'src/utils/auth'
 import { formatPages } from 'src/utils/page'
 import { CreateGroupDto } from './dto/create-group.dto'
@@ -31,6 +32,7 @@ export class GroupController {
   /**
    * 当前热门用户
    */
+  @IsPublic()
   @Get('hot')
   async getHotGroups() {
     const datas = await this.service.getHotGroups()

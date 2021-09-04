@@ -67,6 +67,7 @@ export class UserController {
   /**
    * 当前热门用户
    */
+  @IsPublic()
   @Get('hot')
   async getHotUsers() {
     const datas = await this.service.getHotUsers()

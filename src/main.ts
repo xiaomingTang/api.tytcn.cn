@@ -1,6 +1,7 @@
 import * as helmet from 'helmet'
 import { NestFactory } from '@nestjs/core'
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger'
+import { WsAdapter } from '@nestjs/platform-ws'
 import { AppModule } from './app.module'
 import { AllExceptionFilter } from './filters/all-exception.filter'
 import { HttpExceptionFilter } from './filters/http-exception.filter'
@@ -43,11 +44,17 @@ async function bootstrap() {
 
   // app.use(csurf({ cookie: true }));
 
-  app.useGlobalFilters(new AllExceptionFilter(), new HttpExceptionFilter())
+  app.useGlobalFilters(
+    new AllExceptionFilter(),
+    new HttpExceptionFilter(),
+  )
 
   app.useGlobalInterceptors(new TransformResponseInterceptor())
 
   app.useGlobalPipes(new ValidationPipe())
+
+  // @nestjs/platform-socket.io 提供的 IoAdapter 无效
+  app.useWebSocketAdapter(new WsAdapter(app))
 
   await app.listen(3000)
 

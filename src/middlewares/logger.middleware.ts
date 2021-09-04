@@ -5,7 +5,7 @@ import { formatTimeForFileName } from 'src/utils/time'
 @Injectable()
 export class LoggerMiddleware implements NestMiddleware {
   use(req: Request, res: Response, next: NextFunction) {
-    console.log(`request ${req.url} at ${formatTimeForFileName()}`)
+    console.log(`${formatTimeForFileName()}: request ${req.originalUrl}`)
     next()
   }
 }
